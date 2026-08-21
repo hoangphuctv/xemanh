@@ -1,3 +1,5 @@
+#![windows_subsystem = "windows"]
+
 use macroquad::prelude::*;
 use std::error::Error;
 use std::fs;
@@ -88,30 +90,70 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // Create the Texture2D from the loaded image
     let texture = Texture2D::from_image(&image);
 
+    // Determine the desired window size
+    let mut target_width = texture.width();
+    let mut target_height = texture.height();
+
+    #[cfg(target_os = "windows")]
+    {
+        #[link(name = "user32")]
+        unsafe extern "system" {
+            fn GetSystemMetrics(nIndex: i32) -> i32;
+        }
+        let screen_w = unsafe { GetSystemMetrics(0) } as f32;
+        let screen_h = unsafe { GetSystemMetrics(1) } as f32;
+
+        // If the image fits within the screen, keep it at 100% size.
+        // Otherwise, scale the window down to 90% of screen size to fit nicely.
+        if target_width < screen_w && target_height < screen_h {
+            // Keep original target dimensions
+        } else {
+            let ratio = (screen_w * 0.9 / target_width).min(screen_h * 0.9 / target_height);
+            target_width *= ratio;
+            target_height *= ratio;
+        }
+    }
+
+    // Request the new window size
+    request_new_screen_size(target_width, target_height);
+
     let mut window_centered = false;
+    let mut frame_count = 0;
 
     loop {
-        // Center the window on the screen on Windows
+        // Center the window on the screen on Windows (wait 5 frames for the OS window to resize)
         if !window_centered {
-            if center_window_on_screen("Macroquad Image Viewer") {
-                window_centered = true;
+            frame_count += 1;
+            if frame_count > 5 {
+                if center_window_on_screen("Macroquad Image Viewer") {
+                    window_centered = true;
+                }
             }
         }
 
         // Clear background to a sleek dark color
         clear_background(BLACK);
 
-        // Calculate coordinates to center the image in the window
-        let x = (screen_width() - texture.width()) / 2.0;
-        let y = (screen_height() - texture.height()) / 2.0;
+        // Calculate coordinates and scale to draw the texture centered and fitting the window
+        let w_ratio = screen_width() / texture.width();
+        let h_ratio = screen_height() / texture.height();
+        let scale = w_ratio.min(h_ratio);
 
-        // Draw the texture at the calculated center coordinates
+        let draw_width = texture.width() * scale;
+        let draw_height = texture.height() * scale;
+        let x = (screen_width() - draw_width) / 2.0;
+        let y = (screen_height() - draw_height) / 2.0;
+
+        // Draw the texture
         draw_texture_ex(
             &texture,
             x,
             y,
             WHITE,
-            DrawTextureParams::default(),
+            DrawTextureParams {
+                dest_size: Some(vec2(draw_width, draw_height)),
+                ..Default::default()
+            },
         );
 
         next_frame().await;
