@@ -1,0 +1,8 @@
+[package]
+name = "XA"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+macroquad = "0.4.16"
+image = { version = "0.24", default-features = false, features = ["jpeg", "png", "bmp", "gif"] }
