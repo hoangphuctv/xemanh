@@ -88,19 +88,100 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // Create the Texture2D from the loaded image
     let texture = Texture2D::from_image(&image);
 
+    let mut window_centered = false;
+
     loop {
+        // Center the window on the screen on Windows
+        if !window_centered {
+            if center_window_on_screen("Macroquad Image Viewer") {
+                window_centered = true;
+            }
+        }
+
         // Clear background to a sleek dark color
         clear_background(BLACK);
 
-        // Draw the texture at coordinates (0, 0)
+        // Calculate coordinates to center the image in the window
+        let x = (screen_width() - texture.width()) / 2.0;
+        let y = (screen_height() - texture.height()) / 2.0;
+
+        // Draw the texture at the calculated center coordinates
         draw_texture_ex(
             &texture,
-            0.0,
-            0.0,
+            x,
+            y,
             WHITE,
             DrawTextureParams::default(),
         );
 
         next_frame().await;
+    }
+}
+
+/// Centers the application window on the screen using native OS APIs.
+fn center_window_on_screen(window_title: &str) -> bool {
+    #[cfg(target_os = "windows")]
+    {
+        use std::ffi::CString;
+        #[repr(C)]
+        #[derive(Clone, Copy)]
+        struct RECT {
+            left: i32,
+            top: i32,
+            right: i32,
+            bottom: i32,
+        }
+        #[link(name = "user32")]
+        extern "system" {
+            fn FindWindowA(lpClassName: *const u8, lpWindowName: *const u8) -> *mut std::ffi::c_void;
+            fn GetSystemMetrics(nIndex: i32) -> i32;
+            fn GetWindowRect(hWnd: *mut std::ffi::c_void, lpRect: *mut RECT) -> i32;
+            fn SetWindowPos(
+                hWnd: *mut std::ffi::c_void,
+                hWndInsertAfter: *mut std::ffi::c_void,
+                X: i32,
+                Y: i32,
+                cx: i32,
+                cy: i32,
+                uFlags: u32,
+            ) -> i32;
+        }
+
+        const SM_CXSCREEN: i32 = 0;
+        const SM_CYSCREEN: i32 = 1;
+        const SWP_NOSIZE: u32 = 0x0001;
+        const SWP_NOZORDER: u32 = 0x0004;
+
+        if let Ok(c_title) = CString::new(window_title) {
+            unsafe {
+                let hwnd = FindWindowA(std::ptr::null(), c_title.as_ptr() as *const u8);
+                if !hwnd.is_null() {
+                    let mut rect = RECT { left: 0, top: 0, right: 0, bottom: 0 };
+                    if GetWindowRect(hwnd, &mut rect) != 0 {
+                        let win_width = rect.right - rect.left;
+                        let win_height = rect.bottom - rect.top;
+                        let screen_width = GetSystemMetrics(SM_CXSCREEN);
+                        let screen_height = GetSystemMetrics(SM_CYSCREEN);
+                        let x = (screen_width - win_width) / 2;
+                        let y = (screen_height - win_height) / 2;
+                        SetWindowPos(
+                            hwnd,
+                            std::ptr::null_mut(),
+                            x,
+                            y,
+                            0,
+                            0,
+                            SWP_NOSIZE | SWP_NOZORDER,
+                        );
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        true
     }
 }
