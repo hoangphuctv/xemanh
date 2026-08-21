@@ -132,7 +132,7 @@ fn center_window_on_screen(window_title: &str) -> bool {
             bottom: i32,
         }
         #[link(name = "user32")]
-        extern "system" {
+        unsafe extern "system" {
             fn FindWindowA(lpClassName: *const u8, lpWindowName: *const u8) -> *mut std::ffi::c_void;
             fn GetSystemMetrics(nIndex: i32) -> i32;
             fn GetWindowRect(hWnd: *mut std::ffi::c_void, lpRect: *mut RECT) -> i32;

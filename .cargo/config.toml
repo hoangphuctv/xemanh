@@ -1,0 +1,4 @@
+[target.x86_64-pc-windows-gnu]
+rustflags = [
+    "-L", "native=c:\\Users\\phucth.568E-local\\Desktop\\XA\\lib"
+]
