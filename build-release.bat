@@ -1,5 +1,5 @@
 @echo off
-echo Building XA in Release mode...
+echo Building XemAnh in Release mode...
 where cargo >nul 2>nul
 if %errorlevel% equ 0 (
     cargo build --release

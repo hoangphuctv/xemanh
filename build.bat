@@ -1,5 +1,5 @@
 @echo off
-echo Building XA in Debug mode...
+echo Building XemAnh in Debug mode...
 where cargo >nul 2>nul
 if %errorlevel% equ 0 (
     cargo build

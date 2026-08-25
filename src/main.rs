@@ -365,16 +365,16 @@ impl App {
         self.pan = Vec2::ZERO;
     }
 
-    /// Shows `filename [i/N] - XA` in the window title bar.
+    /// Shows `filename [i/N] - XemAnh` in the window title bar.
     fn update_title(&mut self) {
         if self.hwnd == 0 {
             self.hwnd = win32::find_hwnd();
         }
         let title = if self.entries.is_empty() {
-            "(no images) - XA".to_string()
+            "(no images) - XemAnh".to_string()
         } else {
             format!(
-                "{} [{}/{}] - XA",
+                "{} [{}/{}] - XemAnh",
                 file_name_of(&self.entries[self.index]),
                 self.index + 1,
                 self.entries.len()
@@ -719,7 +719,7 @@ fn file_name_of(path: &Path) -> String {
         .to_string()
 }
 
-#[macroquad::main("XA")]
+#[macroquad::main("XemAnh")]
 async fn main() -> Result<(), Box<dyn Error>> {
     // Get the first command line argument (excluding the binary name itself)
     let arg = std::env::args().nth(1);
