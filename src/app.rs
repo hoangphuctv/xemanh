@@ -152,7 +152,7 @@ impl App {
 
     fn toggle_fullscreen(&mut self) {
         self.fullscreen = !self.fullscreen;
-        macroquad::miniquad::window::set_fullscreen(self.fullscreen);
+        platform::set_fullscreen(self.fullscreen);
         if !self.fullscreen {
             // Restore a sane window size for the current image after exiting fullscreen.
             let (w, h) = platform::clamp_window_target(self.texture.width(), self.texture.height());
