@@ -1,6 +1,9 @@
 use macroquad::prelude::*;
 
-use crate::constants::{DOUBLE_CLICK_SECS, ICON_DATA, TOAST_DURATION};
+use crate::constants::{
+    DOUBLE_CLICK_SECS, DRAG_THRESHOLD_PX, ICON_DATA, TOAST_DURATION, WHEEL_DELTA_UNIT,
+    ZOOM_MAX_NOTCHES_PER_EVENT, ZOOM_PER_NOTCH,
+};
 use crate::gallery::{file_name_of, Gallery};
 use crate::image_io::{load_texture, make_checkerboard, save_transformed, Rot};
 use crate::platform;
@@ -23,6 +26,10 @@ pub struct App {
     hwnd: usize,
     was_maximized: bool,
     scroll_acc: f32,
+    /// Last mouse position while left button is held (pixel space).
+    drag_last: Option<Vec2>,
+    /// True once the current press moved past the drag threshold.
+    dragging: bool,
 }
 
 impl App {
@@ -40,6 +47,8 @@ impl App {
             hwnd: 0,
             was_maximized: false,
             scroll_acc: 0.0,
+            drag_last: None,
+            dragging: false,
         })
     }
 
@@ -99,9 +108,29 @@ impl App {
                 // Never resize while fullscreen or maximized: it breaks the window
                 // state and desynchronizes the GL viewport from the window.
                 if !self.fullscreen && !platform::is_zoomed(self.hwnd) {
-                    let (w, h) =
+                    let current_w = screen_width();
+                    let current_h = screen_height();
+                    let (w_img, h_img) =
                         platform::clamp_window_target(self.texture.width(), self.texture.height());
-                    request_new_screen_size(w, h);
+
+                    // If the current window is already larger than or equal to the target size for the new image,
+                    // we don't need to shrink or change the window size at all.
+                    if current_w < w_img || current_h < h_img {
+                        // The new image target is larger in at least one dimension.
+                        // We grow the window to fit it, but we clamp the target to the screen limits.
+                        let mut w_target = w_img.max(current_w);
+                        let mut h_target = h_img.max(current_h);
+
+                        // Clamp to screen limits
+                        let (clamped_w, clamped_h) = platform::clamp_window_target(w_target, h_target);
+
+                        // If the user had already manually stretched the window to be larger than clamped limits,
+                        // we preserve their manually set size instead of forcing it to shrink.
+                        w_target = clamped_w.max(current_w);
+                        h_target = clamped_h.max(current_h);
+
+                        request_new_screen_size(w_target, h_target);
+                    }
                 }
                 self.update_title();
             }
@@ -217,40 +246,72 @@ impl App {
             self.delete_current();
         }
 
-        // Reset view: 0 or double-click
+        // Reset view: 0 or double-click (click = no drag)
         if is_key_pressed(KeyCode::Key0) {
             self.reset_view();
         }
+
+        let (mx, my) = mouse_position();
+        let mouse = vec2(mx, my);
+        let win_w = screen_width();
+        let win_h = screen_height();
+        let tex_w = self.texture.width();
+        let tex_h = self.texture.height();
+
         if is_mouse_button_pressed(MouseButton::Left) {
-            let now = get_time();
-            if now - self.last_click_time < DOUBLE_CLICK_SECS {
-                self.reset_view();
-            }
-            self.last_click_time = now;
+            self.drag_last = Some(mouse);
+            self.dragging = false;
         }
 
-        // Zoom with scroll wheel (accumulate until threshold)
-        let (_, wheel_y) = mouse_wheel();
-        self.scroll_acc += wheel_y;
-        let threshold = 1.0;
-        if self.scroll_acc.abs() >= threshold {
-            let steps = self.scroll_acc.trunc() as i32;
-            self.scroll_acc -= steps as f32;
-            let factor = 1.08f32.powf(steps as f32);
-            let (mx, my) = mouse_position();
-            self.view.zoom_at_mouse(
-                factor,
-                vec2(mx, my),
-                self.texture.width(),
-                self.texture.height(),
-                screen_width(),
-                screen_height(),
-            );
-        }
-
-        // Pan with left mouse drag
+        // Drag to pan when the image is larger than the window (typically after zoom).
         if is_mouse_button_down(MouseButton::Left) {
-            self.view.pan += mouse_delta_position();
+            if let Some(last) = self.drag_last {
+                let delta = mouse - last;
+                if delta.length_squared() > 0.0 {
+                    if delta.length() >= DRAG_THRESHOLD_PX {
+                        self.dragging = true;
+                    }
+                    if self.view.can_pan(tex_w, tex_h, win_w, win_h) {
+                        self.view.pan += delta;
+                        self.view.pan_target += delta;
+                        self.view.clamp_pan(tex_w, tex_h, win_w, win_h);
+                    }
+                    self.drag_last = Some(mouse);
+                }
+            }
+        } else {
+            self.drag_last = None;
+        }
+
+        if is_mouse_button_released(MouseButton::Left) {
+            if !self.dragging {
+                let now = get_time();
+                if now - self.last_click_time < DOUBLE_CLICK_SECS {
+                    self.reset_view();
+                }
+                self.last_click_time = now;
+            }
+            self.dragging = false;
+        }
+
+        // Zoom with scroll wheel (one gentle step per notch; Windows sends ±120).
+        let (_, wheel_y) = mouse_wheel();
+        if wheel_y != 0.0 {
+            let mut notches = if wheel_y.abs() >= 10.0 {
+                wheel_y / WHEEL_DELTA_UNIT
+            } else {
+                // Already notch-like (Linux/macOS often ±1).
+                wheel_y
+            };
+            notches = notches.clamp(-ZOOM_MAX_NOTCHES_PER_EVENT, ZOOM_MAX_NOTCHES_PER_EVENT);
+            self.scroll_acc += notches;
+            // Apply whole notches; keep fractional remainder for high-res / trackpad wheels.
+            let whole = self.scroll_acc.trunc();
+            if whole != 0.0 {
+                self.scroll_acc -= whole;
+                let factor = ZOOM_PER_NOTCH.powf(whole);
+                self.view.zoom_at_mouse(factor, mouse, tex_w, tex_h, win_w, win_h);
+            }
         }
 
         true
@@ -328,6 +389,12 @@ impl App {
         }
 
         self.view.tick_zoom(get_frame_time());
+        self.view.clamp_pan(
+            self.texture.width(),
+            self.texture.height(),
+            screen_width(),
+            screen_height(),
+        );
 
         clear_background(BLACK);
 

@@ -2,6 +2,20 @@
 
 /// Computes the target window size, clamped to 90% of the screen on Windows.
 pub fn clamp_window_target(width: f32, height: f32) -> (f32, f32) {
+    let mut w = width;
+    let mut h = height;
+
+    // Enforce a minimum window size of 800x600 (landscape/square) or 600x800 (portrait).
+    if w < 800.0 && h < 600.0 {
+        if w >= h {
+            w = 800.0;
+            h = 600.0;
+        } else {
+            w = 600.0;
+            h = 800.0;
+        }
+    }
+
     #[cfg(target_os = "windows")]
     {
         #[link(name = "user32")]
@@ -10,16 +24,16 @@ pub fn clamp_window_target(width: f32, height: f32) -> (f32, f32) {
         }
         let screen_w = unsafe { GetSystemMetrics(0) } as f32;
         let screen_h = unsafe { GetSystemMetrics(1) } as f32;
-        if width < screen_w && height < screen_h {
-            (width, height)
+        if w < screen_w && h < screen_h {
+            (w, h)
         } else {
-            let ratio = (screen_w * 0.9 / width).min(screen_h * 0.9 / height);
-            (width * ratio, height * ratio)
+            let ratio = (screen_w * 0.9 / w).min(screen_h * 0.9 / h);
+            (w * ratio, h * ratio)
         }
     }
     #[cfg(not(target_os = "windows"))]
     {
-        (width, height)
+        (w, h)
     }
 }
 

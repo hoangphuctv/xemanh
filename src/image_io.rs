@@ -63,7 +63,7 @@ pub fn make_checkerboard() -> Texture2D {
     let mut bytes = Vec::with_capacity((size * size * 4) as usize);
     for y in 0..size {
         for x in 0..size {
-            let v: u8 = if ((x / tile) + (y / tile)) % 2 == 0 {
+            let v: u8 = if ((x / tile) + (y / tile)).is_multiple_of(2) {
                 255
             } else {
                 204

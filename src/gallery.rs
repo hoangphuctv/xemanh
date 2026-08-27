@@ -13,7 +13,7 @@ pub fn resolve_path(path: PathBuf) -> PathBuf {
             .or_else(|_| std::env::var("HOME"))
             .unwrap_or_else(|_| ".".to_string());
         let mut resolved = PathBuf::from(home);
-        let clean_sub = rest.trim_start_matches(|c| c == '/' || c == '\\');
+        let clean_sub = rest.trim_start_matches(['/', '\\']);
         if !clean_sub.is_empty() {
             resolved.push(clean_sub);
         }
