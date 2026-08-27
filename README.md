@@ -38,7 +38,7 @@ Double-click file ảnh → cửa sổ vừa khít tấm hình → lướt sang 
 2. Chạy file cài đặt (không cần quyền Administrator)
 3. Double-click bất kỳ ảnh nào để mở bằng XemAnh
 
-Sau khi cài, XemAnh được gán làm trình xem mặc định cho các định dạng ảnh thông dụng. Muốn đổi lại Photos thì vào *Cài đặt Windows → Ứng dụng → Ứng dụng mặc định*.
+Trong lúc cài có tùy chọn (mặc định bật) gán XemAnh làm trình xem mặc định cho các định dạng ảnh thông dụng. Bỏ tick nếu muốn giữ Photos / app cũ; vẫn mở bằng *Open with* hoặc đặt lại trong *Cài đặt Windows → Ứng dụng → Ứng dụng mặc định*.
 
 Gỡ cài đặt như phần mềm Windows thông thường: *Cài đặt → Ứng dụng*.
 

@@ -25,6 +25,7 @@ SetupIconFile=assets\xemanh.ico
 ChangesAssociations=yes
 
 [Tasks]
+Name: "fileassoc"; Description: "Set as the &default viewer for common image files (.jpg, .png, .bmp, .gif, ...)"; GroupDescription: "File associations:"; Flags: checkedonce
 Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription: "Additional icons:"; Flags: unchecked
 
 [Files]
@@ -62,7 +63,7 @@ Root: HKA; Subkey: "Software\{#MyAppName}\Capabilities"; ValueType: string; Valu
 Root: HKA; Subkey: "Software\RegisteredApplications"; ValueType: string; ValueName: "{#MyAppName}"; ValueData: "Software\{#MyAppName}\Capabilities"; Flags: uninsdeletevalue
 
 ; --- .jpg ---
-Root: HKA; Subkey: "Software\Classes\.jpg"; ValueType: string; ValueName: ""; ValueData: "{#MyProgId}"; Flags: uninsdeletevalue
+Root: HKA; Subkey: "Software\Classes\.jpg"; ValueType: string; ValueName: ""; ValueData: "{#MyProgId}"; Flags: uninsdeletevalue; Tasks: fileassoc
 Root: HKA; Subkey: "Software\Classes\.jpg"; ValueType: string; ValueName: "Content Type"; ValueData: "image/jpeg"
 Root: HKA; Subkey: "Software\Classes\.jpg"; ValueType: string; ValueName: "PerceivedType"; ValueData: "image"
 Root: HKA; Subkey: "Software\Classes\.jpg\OpenWithProgids"; ValueType: string; ValueName: "{#MyProgId}"; ValueData: ""; Flags: uninsdeletevalue
@@ -71,7 +72,7 @@ Root: HKA; Subkey: "Software\{#MyAppName}\Capabilities\FileAssociations"; ValueT
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.jpg\OpenWithProgids"; ValueType: string; ValueName: "{#MyProgId}"; ValueData: ""; Flags: uninsdeletevalue
 
 ; --- .jpeg ---
-Root: HKA; Subkey: "Software\Classes\.jpeg"; ValueType: string; ValueName: ""; ValueData: "{#MyProgId}"; Flags: uninsdeletevalue
+Root: HKA; Subkey: "Software\Classes\.jpeg"; ValueType: string; ValueName: ""; ValueData: "{#MyProgId}"; Flags: uninsdeletevalue; Tasks: fileassoc
 Root: HKA; Subkey: "Software\Classes\.jpeg"; ValueType: string; ValueName: "Content Type"; ValueData: "image/jpeg"
 Root: HKA; Subkey: "Software\Classes\.jpeg"; ValueType: string; ValueName: "PerceivedType"; ValueData: "image"
 Root: HKA; Subkey: "Software\Classes\.jpeg\OpenWithProgids"; ValueType: string; ValueName: "{#MyProgId}"; ValueData: ""; Flags: uninsdeletevalue
@@ -80,7 +81,7 @@ Root: HKA; Subkey: "Software\{#MyAppName}\Capabilities\FileAssociations"; ValueT
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.jpeg\OpenWithProgids"; ValueType: string; ValueName: "{#MyProgId}"; ValueData: ""; Flags: uninsdeletevalue
 
 ; --- .jpe ---
-Root: HKA; Subkey: "Software\Classes\.jpe"; ValueType: string; ValueName: ""; ValueData: "{#MyProgId}"; Flags: uninsdeletevalue
+Root: HKA; Subkey: "Software\Classes\.jpe"; ValueType: string; ValueName: ""; ValueData: "{#MyProgId}"; Flags: uninsdeletevalue; Tasks: fileassoc
 Root: HKA; Subkey: "Software\Classes\.jpe"; ValueType: string; ValueName: "Content Type"; ValueData: "image/jpeg"
 Root: HKA; Subkey: "Software\Classes\.jpe"; ValueType: string; ValueName: "PerceivedType"; ValueData: "image"
 Root: HKA; Subkey: "Software\Classes\.jpe\OpenWithProgids"; ValueType: string; ValueName: "{#MyProgId}"; ValueData: ""; Flags: uninsdeletevalue
@@ -89,7 +90,7 @@ Root: HKA; Subkey: "Software\{#MyAppName}\Capabilities\FileAssociations"; ValueT
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.jpe\OpenWithProgids"; ValueType: string; ValueName: "{#MyProgId}"; ValueData: ""; Flags: uninsdeletevalue
 
 ; --- .jfif ---
-Root: HKA; Subkey: "Software\Classes\.jfif"; ValueType: string; ValueName: ""; ValueData: "{#MyProgId}"; Flags: uninsdeletevalue
+Root: HKA; Subkey: "Software\Classes\.jfif"; ValueType: string; ValueName: ""; ValueData: "{#MyProgId}"; Flags: uninsdeletevalue; Tasks: fileassoc
 Root: HKA; Subkey: "Software\Classes\.jfif"; ValueType: string; ValueName: "Content Type"; ValueData: "image/jpeg"
 Root: HKA; Subkey: "Software\Classes\.jfif"; ValueType: string; ValueName: "PerceivedType"; ValueData: "image"
 Root: HKA; Subkey: "Software\Classes\.jfif\OpenWithProgids"; ValueType: string; ValueName: "{#MyProgId}"; ValueData: ""; Flags: uninsdeletevalue
@@ -98,7 +99,7 @@ Root: HKA; Subkey: "Software\{#MyAppName}\Capabilities\FileAssociations"; ValueT
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.jfif\OpenWithProgids"; ValueType: string; ValueName: "{#MyProgId}"; ValueData: ""; Flags: uninsdeletevalue
 
 ; --- .png ---
-Root: HKA; Subkey: "Software\Classes\.png"; ValueType: string; ValueName: ""; ValueData: "{#MyProgId}"; Flags: uninsdeletevalue
+Root: HKA; Subkey: "Software\Classes\.png"; ValueType: string; ValueName: ""; ValueData: "{#MyProgId}"; Flags: uninsdeletevalue; Tasks: fileassoc
 Root: HKA; Subkey: "Software\Classes\.png"; ValueType: string; ValueName: "Content Type"; ValueData: "image/png"
 Root: HKA; Subkey: "Software\Classes\.png"; ValueType: string; ValueName: "PerceivedType"; ValueData: "image"
 Root: HKA; Subkey: "Software\Classes\.png\OpenWithProgids"; ValueType: string; ValueName: "{#MyProgId}"; ValueData: ""; Flags: uninsdeletevalue
@@ -107,7 +108,7 @@ Root: HKA; Subkey: "Software\{#MyAppName}\Capabilities\FileAssociations"; ValueT
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.png\OpenWithProgids"; ValueType: string; ValueName: "{#MyProgId}"; ValueData: ""; Flags: uninsdeletevalue
 
 ; --- .bmp ---
-Root: HKA; Subkey: "Software\Classes\.bmp"; ValueType: string; ValueName: ""; ValueData: "{#MyProgId}"; Flags: uninsdeletevalue
+Root: HKA; Subkey: "Software\Classes\.bmp"; ValueType: string; ValueName: ""; ValueData: "{#MyProgId}"; Flags: uninsdeletevalue; Tasks: fileassoc
 Root: HKA; Subkey: "Software\Classes\.bmp"; ValueType: string; ValueName: "Content Type"; ValueData: "image/bmp"
 Root: HKA; Subkey: "Software\Classes\.bmp"; ValueType: string; ValueName: "PerceivedType"; ValueData: "image"
 Root: HKA; Subkey: "Software\Classes\.bmp\OpenWithProgids"; ValueType: string; ValueName: "{#MyProgId}"; ValueData: ""; Flags: uninsdeletevalue
@@ -116,7 +117,7 @@ Root: HKA; Subkey: "Software\{#MyAppName}\Capabilities\FileAssociations"; ValueT
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.bmp\OpenWithProgids"; ValueType: string; ValueName: "{#MyProgId}"; ValueData: ""; Flags: uninsdeletevalue
 
 ; --- .dib ---
-Root: HKA; Subkey: "Software\Classes\.dib"; ValueType: string; ValueName: ""; ValueData: "{#MyProgId}"; Flags: uninsdeletevalue
+Root: HKA; Subkey: "Software\Classes\.dib"; ValueType: string; ValueName: ""; ValueData: "{#MyProgId}"; Flags: uninsdeletevalue; Tasks: fileassoc
 Root: HKA; Subkey: "Software\Classes\.dib"; ValueType: string; ValueName: "Content Type"; ValueData: "image/bmp"
 Root: HKA; Subkey: "Software\Classes\.dib"; ValueType: string; ValueName: "PerceivedType"; ValueData: "image"
 Root: HKA; Subkey: "Software\Classes\.dib\OpenWithProgids"; ValueType: string; ValueName: "{#MyProgId}"; ValueData: ""; Flags: uninsdeletevalue
@@ -125,7 +126,7 @@ Root: HKA; Subkey: "Software\{#MyAppName}\Capabilities\FileAssociations"; ValueT
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.dib\OpenWithProgids"; ValueType: string; ValueName: "{#MyProgId}"; ValueData: ""; Flags: uninsdeletevalue
 
 ; --- .gif ---
-Root: HKA; Subkey: "Software\Classes\.gif"; ValueType: string; ValueName: ""; ValueData: "{#MyProgId}"; Flags: uninsdeletevalue
+Root: HKA; Subkey: "Software\Classes\.gif"; ValueType: string; ValueName: ""; ValueData: "{#MyProgId}"; Flags: uninsdeletevalue; Tasks: fileassoc
 Root: HKA; Subkey: "Software\Classes\.gif"; ValueType: string; ValueName: "Content Type"; ValueData: "image/gif"
 Root: HKA; Subkey: "Software\Classes\.gif"; ValueType: string; ValueName: "PerceivedType"; ValueData: "image"
 Root: HKA; Subkey: "Software\Classes\.gif\OpenWithProgids"; ValueType: string; ValueName: "{#MyProgId}"; ValueData: ""; Flags: uninsdeletevalue
@@ -134,7 +135,7 @@ Root: HKA; Subkey: "Software\{#MyAppName}\Capabilities\FileAssociations"; ValueT
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.gif\OpenWithProgids"; ValueType: string; ValueName: "{#MyProgId}"; ValueData: ""; Flags: uninsdeletevalue
 
 ; --- .tga ---
-Root: HKA; Subkey: "Software\Classes\.tga"; ValueType: string; ValueName: ""; ValueData: "{#MyProgId}"; Flags: uninsdeletevalue
+Root: HKA; Subkey: "Software\Classes\.tga"; ValueType: string; ValueName: ""; ValueData: "{#MyProgId}"; Flags: uninsdeletevalue; Tasks: fileassoc
 Root: HKA; Subkey: "Software\Classes\.tga"; ValueType: string; ValueName: "Content Type"; ValueData: "image/x-tga"
 Root: HKA; Subkey: "Software\Classes\.tga"; ValueType: string; ValueName: "PerceivedType"; ValueData: "image"
 Root: HKA; Subkey: "Software\Classes\.tga\OpenWithProgids"; ValueType: string; ValueName: "{#MyProgId}"; ValueData: ""; Flags: uninsdeletevalue
@@ -169,6 +170,12 @@ var
   I: Integer;
 begin
   if CurStep <> ssPostInstall then
+    Exit;
+
+  { Always refresh Explorer icons / Open With list. }
+  SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, 0, 0);
+
+  if not WizardIsTaskSelected('fileassoc') then
     Exit;
 
   Exts[0] := 'jpg';
