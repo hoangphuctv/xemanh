@@ -6,7 +6,9 @@ use std::fs;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
-const IMAGE_EXTENSIONS: [&str; 6] = ["jpg", "jpeg", "png", "bmp", "tga", "gif"];
+const IMAGE_EXTENSIONS: [&str; 9] = [
+    "jpg", "jpeg", "jpe", "jfif", "png", "bmp", "dib", "gif", "tga",
+];
 const JPEG_SAVE_QUALITY: u8 = 92;
 const TOAST_DURATION: f64 = 1.2;
 const DOUBLE_CLICK_SECS: f64 = 0.35;
@@ -55,17 +57,16 @@ mod win32 {
 
     #[cfg(target_os = "windows")]
     pub fn set_title(hwnd: usize, text: &str) {
-        use std::ffi::CString;
         #[link(name = "user32")]
         unsafe extern "system" {
-            fn SetWindowTextA(hwnd: *mut std::ffi::c_void, text: *const u8) -> i32;
+            fn SetWindowTextW(hwnd: *mut std::ffi::c_void, text: *const u16) -> i32;
         }
         if hwnd == 0 {
             return;
         }
-        if let Ok(c) = CString::new(text.replace('…', "..")) {
-            unsafe { SetWindowTextA(hwnd as *mut _, c.as_ptr() as *const u8) };
-        }
+        let mut wide: Vec<u16> = text.replace('…', "..").encode_utf16().collect();
+        wide.push(0);
+        unsafe { SetWindowTextW(hwnd as *mut _, wide.as_ptr()) };
     }
 
     #[cfg(not(target_os = "windows"))]
@@ -248,22 +249,23 @@ mod win32 {
     pub fn set_icon(_hwnd: usize, _ico_bytes: &[u8]) {}
 }
 
-/// Resolves a path string, replacing a leading `~` with the user's home directory.
-fn resolve_path(path_str: &str) -> PathBuf {
-    if path_str.starts_with('~') {
+/// Resolves a path, replacing a leading `~` with the user's home directory.
+fn resolve_path(path: PathBuf) -> PathBuf {
+    let Some(path_str) = path.to_str() else {
+        return path;
+    };
+    if let Some(rest) = path_str.strip_prefix('~') {
         let home = std::env::var("USERPROFILE")
             .or_else(|_| std::env::var("HOME"))
             .unwrap_or_else(|_| ".".to_string());
         let mut resolved = PathBuf::from(home);
-        if path_str.len() > 1 {
-            let sub = &path_str[1..];
-            // Normalize path separators by removing leading slashes/backslashes
-            let clean_sub = sub.trim_start_matches(|c| c == '/' || c == '\\');
+        let clean_sub = rest.trim_start_matches(|c| c == '/' || c == '\\');
+        if !clean_sub.is_empty() {
             resolved.push(clean_sub);
         }
         resolved
     } else {
-        PathBuf::from(path_str)
+        path
     }
 }
 
@@ -289,8 +291,7 @@ fn scan_dir_images(dir: &Path) -> Vec<PathBuf> {
     }
     images.sort_by_key(|p| {
         p.file_name()
-            .and_then(|n| n.to_str())
-            .map(|n| n.to_lowercase())
+            .map(|n| n.to_string_lossy().to_lowercase())
             .unwrap_or_default()
     });
     images
@@ -455,12 +456,14 @@ struct App {
     texture: Texture2D,
     checker: Texture2D,
     zoom: f32,
+    zoom_target: f32,
     pan: Vec2,
     fullscreen: bool,
     toast: Option<Toast>,
     last_click_time: f64,
     hwnd: usize,
     was_maximized: bool,
+    scroll_acc: f32,
 }
 
 impl App {
@@ -473,7 +476,7 @@ impl App {
     }
 
     fn reset_view(&mut self) {
-        self.zoom = 1.0;
+        self.zoom_target = 1.0;
         self.pan = Vec2::ZERO;
     }
 
@@ -641,7 +644,7 @@ impl App {
 
         let min_zoom = 0.25;
         let max_zoom = (8.0 / self.base_scale()).max(1.0);
-        self.zoom = (self.zoom * factor).clamp(min_zoom, max_zoom);
+        self.zoom_target = (self.zoom_target * factor).clamp(min_zoom, max_zoom);
 
         let after = self.view_rect_unclamped();
         // pan' = m - center - (m - center - pan_before) * (size_after / size_before)
@@ -722,10 +725,15 @@ impl App {
             self.last_click_time = now;
         }
 
-        // Zoom with scroll wheel
+        // Zoom with scroll wheel (accumulate until threshold)
         let (_, wheel_y) = mouse_wheel();
-        if wheel_y != 0.0 {
-            self.zoom_at_mouse(1.15f32.powf(wheel_y));
+        self.scroll_acc += wheel_y;
+        let threshold = 1.0;
+        if self.scroll_acc.abs() >= threshold {
+            let steps = self.scroll_acc.trunc() as i32;
+            self.scroll_acc -= steps as f32;
+            let factor = 1.08f32.powf(steps as f32);
+            self.zoom_at_mouse(factor);
         }
 
         // Pan with left mouse drag
@@ -807,6 +815,14 @@ impl App {
             return false;
         }
 
+        // Smooth zoom interpolation
+        let lerp_speed = 12.0;
+        let t = 1.0 - (-lerp_speed * get_frame_time()).exp();
+        self.zoom += (self.zoom_target - self.zoom) * t;
+        if (self.zoom - self.zoom_target).abs() < 0.0001 {
+            self.zoom = self.zoom_target;
+        }
+
         clear_background(BLACK);
 
         let rect = self.view_rect();
@@ -829,19 +845,18 @@ impl App {
 
 fn file_name_of(path: &Path) -> String {
     path.file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("?")
-        .to_string()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "?".to_string())
 }
 
 #[macroquad::main("XemAnh")]
 async fn main() -> Result<(), Box<dyn Error>> {
-    // Get the first command line argument (excluding the binary name itself)
-    let arg = std::env::args().nth(1);
+    // Unicode-safe on Windows (Chinese / CJK paths); args() would be lossy.
+    let arg = std::env::args_os().nth(1).map(PathBuf::from);
 
     // Determine the initial image path
     let initial_path: PathBuf = if let Some(val) = arg {
-        let resolved = resolve_path(&val);
+        let resolved = resolve_path(val);
         if resolved.is_dir() {
             scan_dir_images(&resolved)
                 .into_iter()
@@ -858,7 +873,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     } else {
         // Default to ~/Pictures if no argument is provided
-        let pictures_dir = resolve_path("~/Pictures");
+        let pictures_dir = resolve_path(PathBuf::from("~/Pictures"));
         if pictures_dir.is_dir() {
             scan_dir_images(&pictures_dir)
                 .into_iter()
@@ -891,12 +906,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
         texture,
         checker: make_checkerboard(),
         zoom: 1.0,
+        zoom_target: 1.0,
         pan: Vec2::ZERO,
         fullscreen: false,
         toast: None,
         last_click_time: 0.0,
         hwnd: 0,
         was_maximized: false,
+        scroll_acc: 0.0,
     };
     app.update_title();
 

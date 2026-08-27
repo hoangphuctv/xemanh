@@ -16,6 +16,7 @@ if %errorlevel% equ 0 (
 
 if %errorlevel% equ 0 (
     echo [SUCCESS] Build release version succeeded!
+    powershell -NoProfile -ExecutionPolicy Bypass -File "stamp-icon.ps1" -ExePath "target\release\xemanh.exe"
 ) else (
     echo [ERROR] Build failed.
 )
