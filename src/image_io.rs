@@ -35,6 +35,25 @@ impl LoadedImage {
         })
     }
 
+    pub fn rgba(&self) -> &RgbaImage {
+        &self.rgba
+    }
+
+    pub fn png_bytes(&self) -> Result<Vec<u8>, String> {
+        let mut out = Vec::new();
+        let encoder = image::codecs::png::PngEncoder::new(&mut out);
+        use image::ImageEncoder;
+        encoder
+            .write_image(
+                self.rgba.as_raw(),
+                self.rgba.width(),
+                self.rgba.height(),
+                image::ColorType::Rgba8,
+            )
+            .map_err(|e| format!("Cannot encode PNG: {e}"))?;
+        Ok(out)
+    }
+
     pub fn rotate(&mut self, rot: Rot) {
         self.rgba = match rot {
             Rot::None => return,

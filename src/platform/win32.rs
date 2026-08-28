@@ -280,3 +280,190 @@ pub fn set_icon(hwnd: usize, ico_bytes: &[u8]) {
 
 #[cfg(not(target_os = "windows"))]
 pub fn set_icon(_hwnd: usize, _ico_bytes: &[u8]) {}
+
+/// Copies an RGBA image onto the Windows clipboard as CF_DIB (wide app support)
+/// and PNG (keeps transparency in modern apps).
+#[cfg(target_os = "windows")]
+pub fn copy_image_to_clipboard(
+    hwnd: usize,
+    width: u32,
+    height: u32,
+    rgba: &[u8],
+    png: &[u8],
+) -> Result<(), String> {
+    use std::ffi::c_void;
+    use std::ptr;
+
+    #[link(name = "user32")]
+    unsafe extern "system" {
+        fn OpenClipboard(hwnd: *mut c_void) -> i32;
+        fn EmptyClipboard() -> i32;
+        fn SetClipboardData(format: u32, mem: *mut c_void) -> *mut c_void;
+        fn CloseClipboard() -> i32;
+        fn RegisterClipboardFormatW(name: *const u16) -> u32;
+    }
+
+    const CF_DIB: u32 = 8;
+
+    let w = width as usize;
+    let h = height as usize;
+    if w == 0 || h == 0 || rgba.len() != w * h * 4 {
+        return Err("Cannot copy image: invalid pixel data".into());
+    }
+
+    let dib = encode_dib_bgra(width, height, rgba);
+    let h_dib = alloc_hglobal(&dib)?;
+    let h_png = if png.is_empty() {
+        ptr::null_mut()
+    } else {
+        match alloc_hglobal(png) {
+            Ok(h) => h,
+            Err(err) => {
+                unsafe { global_free(h_dib) };
+                return Err(err);
+            }
+        }
+    };
+
+    if unsafe { OpenClipboard(hwnd as *mut c_void) } == 0 {
+        unsafe {
+            global_free(h_dib);
+            if !h_png.is_null() {
+                global_free(h_png);
+            }
+        }
+        return Err("Cannot open clipboard".into());
+    }
+
+    let mut dib_on_clipboard = false;
+    let mut png_on_clipboard = false;
+    let mut err: Option<String> = None;
+
+    if unsafe { EmptyClipboard() } == 0 {
+        err = Some("Cannot clear clipboard".into());
+    } else if unsafe { SetClipboardData(CF_DIB, h_dib) }.is_null() {
+        err = Some("Cannot put image on clipboard".into());
+    } else {
+        dib_on_clipboard = true;
+        if !h_png.is_null() {
+            let mut png_name: Vec<u16> = "PNG".encode_utf16().collect();
+            png_name.push(0);
+            let png_fmt = unsafe { RegisterClipboardFormatW(png_name.as_ptr()) };
+            if png_fmt != 0 && !unsafe { SetClipboardData(png_fmt, h_png) }.is_null() {
+                png_on_clipboard = true;
+            }
+        }
+    }
+
+    unsafe { CloseClipboard() };
+
+    if !dib_on_clipboard {
+        unsafe { global_free(h_dib) };
+    }
+    if !h_png.is_null() && !png_on_clipboard {
+        unsafe { global_free(h_png) };
+    }
+
+    match err {
+        Some(e) => Err(e),
+        None => Ok(()),
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn encode_dib_bgra(width: u32, height: u32, rgba: &[u8]) -> Vec<u8> {
+    let w = width as usize;
+    let h = height as usize;
+    let stride = w * 4;
+    let mut dib = vec![0u8; 40 + stride * h];
+    dib[0..4].copy_from_slice(&40u32.to_le_bytes());
+    dib[4..8].copy_from_slice(&(width as i32).to_le_bytes());
+    dib[8..12].copy_from_slice(&(height as i32).to_le_bytes());
+    dib[12..14].copy_from_slice(&1u16.to_le_bytes());
+    dib[14..16].copy_from_slice(&32u16.to_le_bytes());
+    let size_image = (stride * h) as u32;
+    dib[20..24].copy_from_slice(&size_image.to_le_bytes());
+    for y in 0..h {
+        let src_row = (h - 1 - y) * stride;
+        let dst_row = 40 + y * stride;
+        for x in 0..w {
+            let s = src_row + x * 4;
+            let d = dst_row + x * 4;
+            dib[d] = rgba[s + 2];
+            dib[d + 1] = rgba[s + 1];
+            dib[d + 2] = rgba[s];
+            dib[d + 3] = rgba[s + 3];
+        }
+    }
+    dib
+}
+
+#[cfg(target_os = "windows")]
+fn alloc_hglobal(bytes: &[u8]) -> Result<*mut std::ffi::c_void, String> {
+    const GMEM_MOVEABLE: u32 = 0x0002;
+    let mem = unsafe { global_alloc(GMEM_MOVEABLE, bytes.len()) };
+    if mem.is_null() {
+        return Err("Cannot allocate clipboard memory".into());
+    }
+    let ptr = unsafe { global_lock(mem) };
+    if ptr.is_null() {
+        unsafe { global_free(mem) };
+        return Err("Cannot lock clipboard memory".into());
+    }
+    unsafe {
+        std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr as *mut u8, bytes.len());
+        global_unlock(mem);
+    }
+    Ok(mem)
+}
+
+#[cfg(target_os = "windows")]
+unsafe fn global_alloc(flags: u32, bytes: usize) -> *mut std::ffi::c_void {
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        fn GlobalAlloc(flags: u32, bytes: usize) -> *mut std::ffi::c_void;
+    }
+    unsafe { GlobalAlloc(flags, bytes) }
+}
+
+#[cfg(target_os = "windows")]
+unsafe fn global_lock(mem: *mut std::ffi::c_void) -> *mut std::ffi::c_void {
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        fn GlobalLock(mem: *mut std::ffi::c_void) -> *mut std::ffi::c_void;
+    }
+    unsafe { GlobalLock(mem) }
+}
+
+#[cfg(target_os = "windows")]
+unsafe fn global_unlock(mem: *mut std::ffi::c_void) {
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        fn GlobalUnlock(mem: *mut std::ffi::c_void) -> i32;
+    }
+    unsafe {
+        GlobalUnlock(mem);
+    }
+}
+
+#[cfg(target_os = "windows")]
+unsafe fn global_free(mem: *mut std::ffi::c_void) {
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        fn GlobalFree(mem: *mut std::ffi::c_void) -> *mut std::ffi::c_void;
+    }
+    unsafe {
+        GlobalFree(mem);
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn copy_image_to_clipboard(
+    _hwnd: usize,
+    _width: u32,
+    _height: u32,
+    _rgba: &[u8],
+    _png: &[u8],
+) -> Result<(), String> {
+    Err("Clipboard copy is only supported on Windows".into())
+}

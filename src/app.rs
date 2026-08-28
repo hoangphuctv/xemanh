@@ -176,6 +176,40 @@ impl App {
         platform::set_fullscreen(self.fullscreen);
         if !self.fullscreen {
             self.request_window_for_texture();
+            self.set_toast("Windowed", false);
+        } else {
+            self.set_toast("Fullscreen", false);
+        }
+    }
+
+    fn copy_current(&mut self) {
+        if self.gallery.is_empty() {
+            self.set_toast("No image to copy", true);
+            return;
+        }
+        if self.hwnd == 0 {
+            self.hwnd = platform::find_hwnd();
+        }
+        let rgba = self.image.rgba();
+        let png = match self.image.png_bytes() {
+            Ok(bytes) => bytes,
+            Err(err) => {
+                self.set_toast(err, true);
+                return;
+            }
+        };
+        match platform::copy_image_to_clipboard(
+            self.hwnd,
+            rgba.width(),
+            rgba.height(),
+            rgba.as_raw(),
+            &png,
+        ) {
+            Ok(()) => {
+                let name = file_name_of(&self.gallery.current_path());
+                self.set_toast(format!("Copied {name}"), false);
+            }
+            Err(err) => self.set_toast(err, true),
         }
     }
 
@@ -206,6 +240,7 @@ impl App {
     /// Deletes the current image to the Recycle Bin and shows the next one.
     fn delete_current(&mut self) {
         if self.gallery.is_empty() {
+            self.set_toast("No image to delete", true);
             return;
         }
         let path = self.gallery.current_path();
@@ -269,6 +304,13 @@ impl App {
             self.rotate_and_save(Rot::None);
         }
 
+        // Copy current image to clipboard
+        if is_key_pressed(KeyCode::C)
+            && (is_key_down(KeyCode::LeftControl) || is_key_down(KeyCode::RightControl))
+        {
+            self.copy_current();
+        }
+
         // Delete current image (to Recycle Bin)
         if is_key_pressed(KeyCode::Delete) {
             self.delete_current();
@@ -277,6 +319,7 @@ impl App {
         // Reset view: 0 or double-click (click = no drag)
         if is_key_pressed(KeyCode::Key0) {
             self.reset_view();
+            self.set_toast("View reset", false);
         }
 
         let (mx, my) = mouse_position();
@@ -316,6 +359,7 @@ impl App {
                 let now = get_time();
                 if now - self.last_click_time < DOUBLE_CLICK_SECS {
                     self.reset_view();
+                    self.set_toast("View reset", false);
                 }
                 self.last_click_time = now;
             }

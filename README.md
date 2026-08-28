@@ -71,6 +71,7 @@ Mở một ảnh (double-click, hoặc kéo thả vào XemAnh). Các ảnh khác
 | Di chuyển ảnh đang zoom | Giữ chuột trái và kéo |
 | Về vừa khít cửa sổ | Double-click, hoặc bấm `0` |
 | Toàn màn hình | `Space` |
+| Copy ảnh vào clipboard | `Ctrl` + `C` |
 | Thoát toàn màn hình / thoát app | `Esc` (bấm lần nữa để thoát) |
 | Xoay phải và lưu | `R` |
 | Xoay trái và lưu | `Shift` + `R` |
