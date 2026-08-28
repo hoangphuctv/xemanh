@@ -1,22 +1,23 @@
 //! Small Win32 helpers (no-op stubs on other platforms so call sites stay clean).
 
+use crate::constants::{
+    WINDOW_MIN_LANDSCAPE_H, WINDOW_MIN_LANDSCAPE_W, WINDOW_MIN_PORTRAIT_H, WINDOW_MIN_PORTRAIT_W,
+};
+
 /// Computes the target window size in logical pixels, clamped to 90% of the screen.
 /// `dpi` converts physical screen metrics into the same units as `width`/`height`.
 pub fn clamp_window_target(width: f32, height: f32, dpi: f32) -> (f32, f32) {
     let dpi = dpi.max(1.0);
-    let mut w = width;
-    let mut h = height;
 
-    // Enforce a minimum window size of 800x600 (landscape/square) or 600x800 (portrait).
-    if w < 800.0 && h < 600.0 {
-        if w >= h {
-            w = 800.0;
-            h = 600.0;
-        } else {
-            w = 600.0;
-            h = 800.0;
-        }
-    }
+    let (min_w, min_h) = if height > width {
+        (WINDOW_MIN_PORTRAIT_W, WINDOW_MIN_PORTRAIT_H)
+    } else {
+        (WINDOW_MIN_LANDSCAPE_W, WINDOW_MIN_LANDSCAPE_H)
+    };
+
+    // Apply minimums per axis so wide-but-short images still get a usable window.
+    let mut w = width.max(min_w);
+    let mut h = height.max(min_h);
 
     #[cfg(target_os = "windows")]
     {
@@ -26,12 +27,19 @@ pub fn clamp_window_target(width: f32, height: f32, dpi: f32) -> (f32, f32) {
         }
         let screen_w = unsafe { GetSystemMetrics(0) } as f32 / dpi;
         let screen_h = unsafe { GetSystemMetrics(1) } as f32 / dpi;
-        if w < screen_w && h < screen_h {
-            (w, h)
-        } else {
-            let ratio = (screen_w * 0.9 / w).min(screen_h * 0.9 / h);
-            (w * ratio, h * ratio)
+        let max_w = screen_w * 0.9;
+        let max_h = screen_h * 0.9;
+
+        if w > max_w || h > max_h {
+            let ratio = (max_w / w).min(max_h / h);
+            w *= ratio;
+            h *= ratio;
         }
+
+        // After downscaling, re-apply minimums (extreme aspect ratios can shrink one axis too far).
+        w = w.max(min_w.min(max_w));
+        h = h.max(min_h.min(max_h));
+        (w, h)
     }
     #[cfg(not(target_os = "windows"))]
     {

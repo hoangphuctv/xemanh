@@ -13,6 +13,12 @@ pub const ZOOM_PER_NOTCH: f32 = 1.055;
 pub const DRAG_THRESHOLD_PX: f32 = 4.0;
 /// How quickly displayed zoom catches up to the target (lower = calmer).
 pub const ZOOM_LERP_SPEED: f32 = 6.0;
+/// Minimum window size (logical px) when the image is landscape or square.
+pub const WINDOW_MIN_LANDSCAPE_W: f32 = 800.0;
+pub const WINDOW_MIN_LANDSCAPE_H: f32 = 600.0;
+/// Minimum window size (logical px) when the image is portrait.
+pub const WINDOW_MIN_PORTRAIT_W: f32 = 600.0;
+pub const WINDOW_MIN_PORTRAIT_H: f32 = 800.0;
 /// Windows `WHEEL_DELTA`; used to turn raw wheel events into notches.
 pub const WHEEL_DELTA_UNIT: f32 = 120.0;
 /// Cap notches processed from a single wheel burst (trackpad flicks).

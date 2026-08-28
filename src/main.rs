@@ -19,6 +19,8 @@ use platform::clamp_window_target;
 fn window_conf() -> Conf {
     Conf {
         window_title: "XemAnh".to_owned(),
+        window_width: 800,
+        window_height: 600,
         high_dpi: true,
         window_resizable: true,
         ..Default::default()
