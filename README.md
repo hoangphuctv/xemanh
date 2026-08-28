@@ -6,12 +6,14 @@
 
 <p align="center">
   <strong>Mở ảnh là xem ngay.</strong><br>
-  Trình xem ảnh nhẹ cho Windows — không quảng cáo, không tài khoản, không rườm rà.
+  Trình xem ảnh nhẹ cho Windows &amp; Linux — không quảng cáo, không tài khoản, không rườm rà.
 </p>
 
 <p align="center">
-  <a href="installer/xemanh-0.1.0-setup.exe">Tải bản cài đặt</a>
+  <a href="installer/xemanh-0.1.0-setup.exe">Tải bản cài Windows</a>
   · Windows 10 / 11
+  &nbsp;·&nbsp;
+  <a href="installer/xemanh_0.1.0_amd64.deb">Tải bản .deb Linux</a>
 </p>
 
 ---
@@ -34,6 +36,8 @@ Double-click file ảnh → cửa sổ vừa khít tấm hình → lướt sang 
 
 ## Cài đặt
 
+### Windows
+
 1. Tải [xemanh-0.1.0-setup.exe](installer/xemanh-0.1.0-setup.exe)
 2. Chạy file cài đặt (không cần quyền Administrator)
 3. Double-click bất kỳ ảnh nào để mở bằng XemAnh
@@ -41,6 +45,19 @@ Double-click file ảnh → cửa sổ vừa khít tấm hình → lướt sang 
 Trong lúc cài có tùy chọn (mặc định bật) gán XemAnh làm trình xem mặc định cho các định dạng ảnh thông dụng. Bỏ tick nếu muốn giữ Photos / app cũ; vẫn mở bằng *Open with* hoặc đặt lại trong *Cài đặt Windows → Ứng dụng → Ứng dụng mặc định*.
 
 Gỡ cài đặt như phần mềm Windows thông thường: *Cài đặt → Ứng dụng*.
+
+### Linux (Debian / Ubuntu / Mint / …)
+
+1. Tải [xemanh_0.1.0_amd64.deb](installer/xemanh_0.1.0_amd64.deb) (hoặc tự build bằng `./package-deb.sh`)
+2. Cài đặt:
+
+```bash
+sudo apt install ./installer/xemanh_0.1.0_amd64.deb
+```
+
+3. Mở ảnh bằng *Open With → XemAnh*, hoặc chạy `xemanh ảnh.jpg` trên terminal.
+
+Gỡ: `sudo apt remove xemanh`.
 
 ## Dùng như thế nào
 

@@ -2,6 +2,11 @@
 name = "xemanh"
 version = "0.1.0"
 edition = "2024"
+description = "Lightweight image viewer"
+authors = ["hoangphuctv"]
+readme = "README.md"
+keywords = ["image", "viewer", "photo"]
+categories = ["multimedia"]
 
 [dependencies]
 macroquad = "0.4.16"

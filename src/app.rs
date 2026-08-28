@@ -173,7 +173,7 @@ impl App {
 
     fn toggle_fullscreen(&mut self) {
         self.fullscreen = !self.fullscreen;
-        macroquad::miniquad::window::set_fullscreen(self.fullscreen);
+        platform::set_fullscreen(self.fullscreen);
         if !self.fullscreen {
             self.request_window_for_texture();
         }
