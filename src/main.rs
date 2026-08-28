@@ -16,7 +16,16 @@ use app::App;
 use gallery::Gallery;
 use platform::clamp_window_target;
 
-#[macroquad::main("XemAnh")]
+fn window_conf() -> Conf {
+    Conf {
+        window_title: "XemAnh".to_owned(),
+        high_dpi: true,
+        window_resizable: true,
+        ..Default::default()
+    }
+}
+
+#[macroquad::main(window_conf)]
 async fn main() -> Result<(), Box<dyn Error>> {
     // Unicode-safe on Windows (Chinese / CJK paths); args() would be lossy.
     let arg = std::env::args_os().nth(1).map(PathBuf::from);
@@ -25,7 +34,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     app.update_title();
 
     let (tw, th) = app.texture_size();
-    let (w, h) = clamp_window_target(tw, th);
+    let dpi = screen_dpi_scale().max(1.0);
+    let (w, h) = clamp_window_target(tw / dpi, th / dpi, dpi);
     request_new_screen_size(w, h);
 
     loop {

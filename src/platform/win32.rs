@@ -1,7 +1,9 @@
 //! Small Win32 helpers (no-op stubs on other platforms so call sites stay clean).
 
-/// Computes the target window size, clamped to 90% of the screen on Windows.
-pub fn clamp_window_target(width: f32, height: f32) -> (f32, f32) {
+/// Computes the target window size in logical pixels, clamped to 90% of the screen.
+/// `dpi` converts physical screen metrics into the same units as `width`/`height`.
+pub fn clamp_window_target(width: f32, height: f32, dpi: f32) -> (f32, f32) {
+    let dpi = dpi.max(1.0);
     let mut w = width;
     let mut h = height;
 
@@ -22,8 +24,8 @@ pub fn clamp_window_target(width: f32, height: f32) -> (f32, f32) {
         unsafe extern "system" {
             fn GetSystemMetrics(nIndex: i32) -> i32;
         }
-        let screen_w = unsafe { GetSystemMetrics(0) } as f32;
-        let screen_h = unsafe { GetSystemMetrics(1) } as f32;
+        let screen_w = unsafe { GetSystemMetrics(0) } as f32 / dpi;
+        let screen_h = unsafe { GetSystemMetrics(1) } as f32 / dpi;
         if w < screen_w && h < screen_h {
             (w, h)
         } else {
@@ -33,6 +35,7 @@ pub fn clamp_window_target(width: f32, height: f32) -> (f32, f32) {
     }
     #[cfg(not(target_os = "windows"))]
     {
+        let _ = dpi;
         (w, h)
     }
 }

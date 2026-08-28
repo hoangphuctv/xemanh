@@ -5,7 +5,7 @@ use crate::constants::{
     ZOOM_MAX_NOTCHES_PER_EVENT, ZOOM_PER_NOTCH,
 };
 use crate::gallery::{file_name_of, Gallery};
-use crate::image_io::{load_texture, make_checkerboard, save_transformed, Rot};
+use crate::image_io::{apply_display_filter, make_checkerboard, LoadedImage, Rot};
 use crate::platform;
 use crate::view::ViewState;
 
@@ -17,6 +17,7 @@ struct Toast {
 
 pub struct App {
     gallery: Gallery,
+    image: LoadedImage,
     texture: Texture2D,
     checker: Texture2D,
     view: ViewState,
@@ -35,9 +36,11 @@ pub struct App {
 impl App {
     pub fn new(gallery: Gallery) -> Result<Self, String> {
         let path = gallery.current().ok_or_else(|| "Gallery is empty".to_string())?;
-        let texture = load_texture(path)?;
+        let image = LoadedImage::load(path)?;
+        let texture = image.upload_texture()?;
         Ok(Self {
             gallery,
+            image,
             texture,
             checker: make_checkerboard(),
             view: ViewState::default(),
@@ -80,6 +83,16 @@ impl App {
         platform::set_title(self.hwnd, &title);
     }
 
+    fn request_window_for_texture(&self) {
+        let dpi = screen_dpi_scale().max(1.0);
+        let (w, h) = platform::clamp_window_target(
+            self.texture.width() / dpi,
+            self.texture.height() / dpi,
+            dpi,
+        );
+        request_new_screen_size(w, h);
+    }
+
     /// Tracks maximize state; when the user un-maximizes, restore a window size
     /// matching the current image.
     fn sync_window_state(&mut self) {
@@ -91,8 +104,7 @@ impl App {
         }
         let maximized = platform::is_zoomed(self.hwnd);
         if self.was_maximized && !maximized && !self.fullscreen {
-            let (w, h) = platform::clamp_window_target(self.texture.width(), self.texture.height());
-            request_new_screen_size(w, h);
+            self.request_window_for_texture();
         }
         self.was_maximized = maximized;
     }
@@ -100,9 +112,13 @@ impl App {
     /// Loads the image at `index`, resizes the window accordingly and resets the view.
     fn load_index(&mut self, index: usize) {
         let path = self.gallery.entries[index].clone();
-        match load_texture(&path) {
-            Ok(texture) => {
+        match LoadedImage::load(&path).and_then(|img| {
+            let texture = img.upload_texture()?;
+            Ok((img, texture))
+        }) {
+            Ok((image, texture)) => {
                 self.gallery.index = index;
+                self.image = image;
                 self.texture = texture;
                 self.reset_view();
                 // Never resize while fullscreen or maximized: it breaks the window
@@ -110,8 +126,12 @@ impl App {
                 if !self.fullscreen && !platform::is_zoomed(self.hwnd) {
                     let current_w = screen_width();
                     let current_h = screen_height();
-                    let (w_img, h_img) =
-                        platform::clamp_window_target(self.texture.width(), self.texture.height());
+                    let dpi = screen_dpi_scale().max(1.0);
+                    let (w_img, h_img) = platform::clamp_window_target(
+                        self.texture.width() / dpi,
+                        self.texture.height() / dpi,
+                        dpi,
+                    );
 
                     // If the current window is already larger than or equal to the target size for the new image,
                     // we don't need to shrink or change the window size at all.
@@ -122,7 +142,8 @@ impl App {
                         let mut h_target = h_img.max(current_h);
 
                         // Clamp to screen limits
-                        let (clamped_w, clamped_h) = platform::clamp_window_target(w_target, h_target);
+                        let (clamped_w, clamped_h) =
+                            platform::clamp_window_target(w_target, h_target, dpi);
 
                         // If the user had already manually stretched the window to be larger than clamped limits,
                         // we preserve their manually set size instead of forcing it to shrink.
@@ -154,23 +175,30 @@ impl App {
         self.fullscreen = !self.fullscreen;
         macroquad::miniquad::window::set_fullscreen(self.fullscreen);
         if !self.fullscreen {
-            // Restore a sane window size for the current image after exiting fullscreen.
-            let (w, h) = platform::clamp_window_target(self.texture.width(), self.texture.height());
-            request_new_screen_size(w, h);
+            self.request_window_for_texture();
         }
     }
 
     fn rotate_and_save(&mut self, rot: Rot) {
-        let path = self.gallery.current_path();
-        match save_transformed(&path, rot) {
-            Ok(()) => match load_texture(&path) {
+        if rot != Rot::None {
+            self.image.rotate(rot);
+            match self.image.upload_texture() {
                 Ok(texture) => {
                     self.texture = texture;
                     self.reset_view();
-                    self.set_toast(format!("Saved {}", file_name_of(&path)), false);
+                    if !self.fullscreen && !platform::is_zoomed(self.hwnd) {
+                        self.request_window_for_texture();
+                    }
                 }
-                Err(err) => self.set_toast(format!("Saved but reload failed: {err}"), true),
-            },
+                Err(err) => {
+                    self.set_toast(err, true);
+                    return;
+                }
+            }
+        }
+        let path = self.gallery.current_path();
+        match self.image.save() {
+            Ok(()) => self.set_toast(format!("Saved {}", file_name_of(&path)), false),
             Err(err) => self.set_toast(err, true),
         }
     }
@@ -405,6 +433,7 @@ impl App {
             screen_height(),
         );
         self.draw_checkerboard(rect);
+        apply_display_filter(&self.texture, rect.w, rect.h);
         draw_texture_ex(
             &self.texture,
             rect.x,

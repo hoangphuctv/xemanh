@@ -69,4 +69,4 @@ echo.
 echo [3/3] Done!
 echo Installer: installer\xemanh-0.1.0-setup.exe
 echo.
-pause
+REM pause

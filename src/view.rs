@@ -46,10 +46,11 @@ impl ViewState {
         (win_w / tex_w).min(win_h / tex_h)
     }
 
-    /// Scale at zoom = 1.0: native size when the image fits the window,
-    /// scaled down only when the image is larger than the window.
+    /// Scale at zoom = 1.0: one image pixel maps to one physical screen pixel
+    /// when the image fits; only shrinks when the image is larger than the window.
     pub fn base_scale(tex_w: f32, tex_h: f32, win_w: f32, win_h: f32) -> f32 {
-        Self::fit_scale(tex_w, tex_h, win_w, win_h).min(1.0)
+        let native = 1.0 / screen_dpi_scale().max(1.0);
+        Self::fit_scale(tex_w, tex_h, win_w, win_h).min(native)
     }
 
     fn displayed_size(tex_w: f32, tex_h: f32, win_w: f32, win_h: f32, zoom: f32) -> (f32, f32) {
@@ -113,10 +114,10 @@ impl ViewState {
         };
 
         Rect {
-            x: win_w / 2.0 + pan_x - disp_w / 2.0,
-            y: win_h / 2.0 + pan_y - disp_h / 2.0,
-            w: disp_w,
-            h: disp_h,
+            x: (win_w / 2.0 + pan_x - disp_w / 2.0).round(),
+            y: (win_h / 2.0 + pan_y - disp_h / 2.0).round(),
+            w: disp_w.round().max(1.0),
+            h: disp_h.round().max(1.0),
         }
     }
 
