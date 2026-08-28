@@ -8,3 +8,4 @@
 *.sln
 *.sw?
 installer/*.deb
+installer/*.exe

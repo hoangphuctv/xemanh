@@ -30,6 +30,16 @@ if %errorlevel% neq 0 (
 echo [OK] Release build succeeded.
 echo.
 
+:: Build helper that sets Windows default image associations (UserChoice hash)
+echo [1c/3] Building default-association helper...
+cargo build --release --manifest-path "packaging\windows\set-default-assoc\Cargo.toml"
+if %errorlevel% neq 0 (
+    echo [ERROR] Failed to build xemanh-set-default.exe
+    pause
+    exit /b 1
+)
+echo.
+
 :: Embed Windows icon into the exe (Start Menu / Explorer / taskbar)
 echo [1b/3] Embedding application icon...
 powershell -NoProfile -ExecutionPolicy Bypass -File "stamp-icon.ps1" -ExePath "target\release\xemanh.exe"
@@ -67,6 +77,6 @@ echo.
 
 :: Done
 echo [3/3] Done!
-echo Installer: installer\xemanh-0.1.0-setup.exe
+echo Installer: installer\xemanh-0.1.1-setup.exe
 echo.
 REM pause

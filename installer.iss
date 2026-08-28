@@ -25,12 +25,13 @@ SetupIconFile=assets\xemanh.ico
 ChangesAssociations=yes
 
 [Tasks]
-Name: "fileassoc"; Description: "Set as the &default viewer for common image files (.jpg, .png, .bmp, .gif, ...)"; GroupDescription: "File associations:"; Flags: checkedonce
+Name: "fileassoc"; Description: "Set as the &default viewer for common image files (.jpg, .png, .bmp, .gif, ...)"; GroupDescription: "File associations:"
 Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription: "Additional icons:"; Flags: unchecked
 
 [Files]
 Source: "target\release\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "assets\xemanh.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "packaging\windows\set-default-assoc\target\release\xemanh-set-default.exe"; DestDir: "{app}"; Flags: ignoreversion; Tasks: fileassoc
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\xemanh.ico"
@@ -154,20 +155,9 @@ const
 procedure SHChangeNotify(wEventId: Longint; uFlags: UINT; dwItem1, dwItem2: Integer);
   external 'SHChangeNotify@shell32.dll stdcall';
 
-procedure ClearExtUserChoice(const Ext: string);
-var
-  Base: string;
-begin
-  Base := 'Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.' + Ext;
-  { Remove previous default so our ProgID becomes the handler. }
-  RegDeleteKeyIncludingSubkeys(HKCU, Base + '\UserChoice');
-  RegDeleteKeyIncludingSubkeys(HKCU, Base + '\UserChoiceNew');
-end;
-
 procedure CurStepChanged(CurStep: TSetupStep);
 var
-  Exts: array[0..8] of string;
-  I: Integer;
+  ResultCode: Integer;
 begin
   if CurStep <> ssPostInstall then
     Exit;
@@ -178,18 +168,18 @@ begin
   if not WizardIsTaskSelected('fileassoc') then
     Exit;
 
-  Exts[0] := 'jpg';
-  Exts[1] := 'jpeg';
-  Exts[2] := 'jpe';
-  Exts[3] := 'jfif';
-  Exts[4] := 'png';
-  Exts[5] := 'bmp';
-  Exts[6] := 'dib';
-  Exts[7] := 'gif';
-  Exts[8] := 'tga';
-
-  for I := 0 to GetArrayLength(Exts) - 1 do
-    ClearExtUserChoice(Exts[I]);
+  { Windows 10/11 requires a valid UserChoice hash; registry ProgID alone is ignored. }
+  if not Exec(
+    ExpandConstant('{app}\xemanh-set-default.exe'),
+    '',
+    ExpandConstant('{app}'),
+    SW_HIDE,
+    ewWaitUntilTerminated,
+    ResultCode
+  ) then
+    Log('Failed to launch xemanh-set-default.exe')
+  else if ResultCode <> 0 then
+    Log('xemanh-set-default.exe exited with code ' + IntToStr(ResultCode));
 
   SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, 0, 0);
 end;
