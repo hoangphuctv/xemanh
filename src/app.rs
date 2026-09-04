@@ -279,10 +279,10 @@ impl App {
         }
 
         // Navigation
-        if is_key_pressed(KeyCode::Right) || is_key_pressed(KeyCode::PageDown) {
+        if is_key_pressed(KeyCode::Right) || is_key_pressed(KeyCode::PageDown) || is_key_pressed(KeyCode::Down) {
             self.next_image();
         }
-        if is_key_pressed(KeyCode::Left) || is_key_pressed(KeyCode::PageUp) {
+        if is_key_pressed(KeyCode::Left) || is_key_pressed(KeyCode::PageUp) || is_key_pressed(KeyCode::Up) {
             self.prev_image();
         }
         if is_key_pressed(KeyCode::Home) && !self.gallery.is_empty() {

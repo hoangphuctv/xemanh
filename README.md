@@ -10,10 +10,10 @@
 </p>
 
 <p align="center">
-  <a href="installer/xemanh-0.1.0-setup.exe">Tải bản cài Windows</a>
+  <a href="releases/latest/download/xemanh-0.1.1-setup.exe">Tải bản cài Windows</a>
   · Windows 10 / 11
   &nbsp;·&nbsp;
-  <a href="installer/xemanh_0.1.0_amd64.deb">Tải bản .deb Linux</a>
+  <a href="releases/latest">Tải bản .deb Linux</a>
 </p>
 
 ---
@@ -38,7 +38,7 @@ Double-click file ảnh → cửa sổ vừa khít tấm hình → lướt sang 
 
 ### Windows
 
-1. Tải [xemanh-0.1.0-setup.exe](installer/xemanh-0.1.0-setup.exe)
+1. Tải [bản cài Windows mới nhất](releases/latest/download/xemanh-0.1.1-setup.exe)
 2. Chạy file cài đặt (không cần quyền Administrator)
 3. Double-click bất kỳ ảnh nào để mở bằng XemAnh
 
@@ -48,11 +48,11 @@ Gỡ cài đặt như phần mềm Windows thông thường: *Cài đặt → �
 
 ### Linux (Debian / Ubuntu / Mint / …)
 
-1. Tải [xemanh_0.1.0_amd64.deb](installer/xemanh_0.1.0_amd64.deb) (hoặc tự build bằng `./package-deb.sh`)
+1. Tải file `.deb` từ [Releases mới nhất](releases/latest) (hoặc tự build bằng `./package-deb.sh`)
 2. Cài đặt:
 
 ```bash
-sudo apt install ./installer/xemanh_0.1.0_amd64.deb
+sudo apt install ./xemanh_*_amd64.deb
 ```
 
 3. Mở ảnh bằng *Open With → XemAnh*, hoặc chạy `xemanh ảnh.jpg` trên terminal.
