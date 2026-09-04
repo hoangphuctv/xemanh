@@ -329,6 +329,10 @@ impl App {
         let tex_w = self.texture.width();
         let tex_h = self.texture.height();
 
+        if is_mouse_button_pressed(MouseButton::Middle) {
+            self.reset_view();
+        }
+
         if is_mouse_button_pressed(MouseButton::Left) {
             self.drag_last = Some(mouse);
             self.dragging = false;
