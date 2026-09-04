@@ -279,10 +279,10 @@ impl App {
         }
 
         // Navigation
-        if is_key_pressed(KeyCode::Right) || is_key_pressed(KeyCode::PageDown) {
+        if is_key_pressed(KeyCode::Right) || is_key_pressed(KeyCode::PageDown) || is_key_pressed(KeyCode::Down) {
             self.next_image();
         }
-        if is_key_pressed(KeyCode::Left) || is_key_pressed(KeyCode::PageUp) {
+        if is_key_pressed(KeyCode::Left) || is_key_pressed(KeyCode::PageUp) || is_key_pressed(KeyCode::Up) {
             self.prev_image();
         }
         if is_key_pressed(KeyCode::Home) && !self.gallery.is_empty() {
@@ -328,6 +328,10 @@ impl App {
         let win_h = screen_height();
         let tex_w = self.texture.width();
         let tex_h = self.texture.height();
+
+        if is_mouse_button_pressed(MouseButton::Middle) {
+            self.reset_view();
+        }
 
         if is_mouse_button_pressed(MouseButton::Left) {
             self.drag_last = Some(mouse);
