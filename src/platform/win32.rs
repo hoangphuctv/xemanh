@@ -4,11 +4,57 @@ use crate::constants::{
     WINDOW_MIN_LANDSCAPE_H, WINDOW_MIN_LANDSCAPE_W, WINDOW_MIN_PORTRAIT_H, WINDOW_MIN_PORTRAIT_W,
 };
 
+/// Returns the usable screen size in logical pixels for auto window sizing.
+fn screen_size_logical(dpi: f32) -> (f32, f32) {
+    #[cfg(target_os = "windows")]
+    {
+        #[link(name = "user32")]
+        unsafe extern "system" {
+            fn GetSystemMetrics(nIndex: i32) -> i32;
+        }
+        let dpi = dpi.max(1.0);
+        (
+            unsafe { GetSystemMetrics(0) } as f32 / dpi,
+            unsafe { GetSystemMetrics(1) } as f32 / dpi,
+        )
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let _ = dpi;
+        super::macos::screen_size_logical()
+    }
+    #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
+    {
+        let _ = dpi;
+        (f32::MAX, f32::MAX)
+    }
+}
+
+/// Shrinks `(w, h)` to fit within `max_w` × `max_h` while preserving aspect ratio.
+fn clamp_to_screen_limits(
+    w: f32,
+    h: f32,
+    min_w: f32,
+    min_h: f32,
+    max_w: f32,
+    max_h: f32,
+) -> (f32, f32) {
+    let (mut w, mut h) = (w, h);
+    if w > max_w || h > max_h {
+        let ratio = (max_w / w).min(max_h / h);
+        w *= ratio;
+        h *= ratio;
+    }
+    // After downscaling, re-apply minimums (extreme aspect ratios can shrink one axis too far).
+    w = w.max(min_w.min(max_w));
+    h = h.max(min_h.min(max_h));
+    (w, h)
+}
+
 /// Computes the target window size in logical pixels, clamped to 90% of the screen.
+/// Used only for programmatic auto-resize; manual user resizing is not limited.
 /// `dpi` converts physical screen metrics into the same units as `width`/`height`.
 pub fn clamp_window_target(width: f32, height: f32, dpi: f32) -> (f32, f32) {
-    let dpi = dpi.max(1.0);
-
     let (min_w, min_h) = if height > width {
         (WINDOW_MIN_PORTRAIT_W, WINDOW_MIN_PORTRAIT_H)
     } else {
@@ -16,36 +62,13 @@ pub fn clamp_window_target(width: f32, height: f32, dpi: f32) -> (f32, f32) {
     };
 
     // Apply minimums per axis so wide-but-short images still get a usable window.
-    let mut w = width.max(min_w);
-    let mut h = height.max(min_h);
+    let w = width.max(min_w);
+    let h = height.max(min_h);
 
-    #[cfg(target_os = "windows")]
-    {
-        #[link(name = "user32")]
-        unsafe extern "system" {
-            fn GetSystemMetrics(nIndex: i32) -> i32;
-        }
-        let screen_w = unsafe { GetSystemMetrics(0) } as f32 / dpi;
-        let screen_h = unsafe { GetSystemMetrics(1) } as f32 / dpi;
-        let max_w = screen_w * 0.9;
-        let max_h = screen_h * 0.9;
-
-        if w > max_w || h > max_h {
-            let ratio = (max_w / w).min(max_h / h);
-            w *= ratio;
-            h *= ratio;
-        }
-
-        // After downscaling, re-apply minimums (extreme aspect ratios can shrink one axis too far).
-        w = w.max(min_w.min(max_w));
-        h = h.max(min_h.min(max_h));
-        (w, h)
-    }
-    #[cfg(not(target_os = "windows"))]
-    {
-        let _ = dpi;
-        (w, h)
-    }
+    let (screen_w, screen_h) = screen_size_logical(dpi);
+    let max_w = screen_w * 0.9;
+    let max_h = screen_h * 0.9;
+    clamp_to_screen_limits(w, h, min_w, min_h, max_w, max_h)
 }
 
 #[cfg(target_os = "windows")]

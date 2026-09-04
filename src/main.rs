@@ -14,7 +14,7 @@ use macroquad::prelude::*;
 
 use app::App;
 use gallery::Gallery;
-use platform::clamp_window_target;
+use platform::{clamp_window_target, request_window_size};
 
 fn window_conf() -> Conf {
     Conf {
@@ -38,9 +38,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let (tw, th) = app.texture_size();
     let dpi = screen_dpi_scale().max(1.0);
     let (w, h) = clamp_window_target(tw / dpi, th / dpi, dpi);
-    request_new_screen_size(w, h);
+    #[cfg(not(target_os = "macos"))]
+    request_window_size(w, h);
+
+    #[cfg(target_os = "macos")]
+    let mut pending_size = Some((w, h));
 
     loop {
+        #[cfg(target_os = "macos")]
+        if let Some((w, h)) = pending_size.take() {
+            request_window_size(w, h);
+        }
         if !app.update() {
             break;
         }

@@ -90,7 +90,7 @@ impl App {
             self.texture.height() / dpi,
             dpi,
         );
-        request_new_screen_size(w, h);
+        platform::request_window_size(w, h);
     }
 
     /// Tracks maximize state; when the user un-maximizes, restore a window size
@@ -150,7 +150,7 @@ impl App {
                         w_target = clamped_w.max(current_w);
                         h_target = clamped_h.max(current_h);
 
-                        request_new_screen_size(w_target, h_target);
+                        platform::request_window_size(w_target, h_target);
                     }
                 }
                 self.update_title();

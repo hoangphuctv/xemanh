@@ -328,4 +328,5 @@ dependencies = [
  "image",
  "kamadak-exif",
  "macroquad",
+ "objc-rs",
 ]
