@@ -154,6 +154,8 @@ impl App {
                     }
                 }
                 self.update_title();
+                let label = self.gallery.title_label();
+                self.set_toast(label, false);
             }
             Err(err) => self.set_toast(format!("[{}] {}", index + 1, err), true),
         }
