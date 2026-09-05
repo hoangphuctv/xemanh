@@ -77,6 +77,15 @@ impl Gallery {
         Self::from_image_path(initial_path)
     }
 
+    /// Builds a gallery from a given path (file or directory).
+    pub fn from_path(path: PathBuf) -> Result<Self, String> {
+        let resolved = resolve_path(path);
+        if resolved.is_dir() {
+            return Self::from_startup_arg(Some(resolved));
+        }
+        Self::from_image_path(resolved)
+    }
+
     /// Scans the folder containing `initial` and selects that image.
     pub fn from_image_path(initial: PathBuf) -> Result<Self, String> {
         let dir = initial

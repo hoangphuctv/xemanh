@@ -162,6 +162,44 @@ impl App {
         }
     }
 
+    /// Handles files dropped onto the window, reloading the gallery & image.
+    fn handle_dropped_files(&mut self) {
+        let dropped = macroquad::input::get_dropped_files();
+        if dropped.is_empty() {
+            return;
+        }
+        let Some(first_path) = dropped.into_iter().find_map(|f| f.path) else {
+            return;
+        };
+        match Gallery::from_path(first_path) {
+            Ok(gallery) => {
+                let Some(current_path) = gallery.current() else {
+                    self.set_toast("No images found in dropped location", true);
+                    return;
+                };
+                match LoadedImage::load(current_path).and_then(|img| {
+                    let tex = img.upload_texture()?;
+                    Ok((img, tex))
+                }) {
+                    Ok((image, texture)) => {
+                        self.gallery = gallery;
+                        self.image = image;
+                        self.texture = texture;
+                        self.reset_view();
+                        if !self.fullscreen && !platform::is_zoomed(self.hwnd) {
+                            self.request_window_for_texture();
+                        }
+                        self.update_title();
+                        let name = file_name_of(&self.gallery.current_path());
+                        self.set_toast(format!("Opened {name}"), false);
+                    }
+                    Err(err) => self.set_toast(err, true),
+                }
+            }
+            Err(err) => self.set_toast(err, true),
+        }
+    }
+
     fn next_image(&mut self) {
         if let Some(next) = self.gallery.next_index() {
             self.load_index(next);
@@ -464,6 +502,7 @@ impl App {
     }
 
     pub fn update(&mut self) -> bool {
+        self.handle_dropped_files();
         self.sync_window_state();
         if !self.handle_input() {
             return false;
