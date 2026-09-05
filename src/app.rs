@@ -2,11 +2,12 @@ use macroquad::prelude::*;
 
 use crate::constants::{
     DOUBLE_CLICK_SECS, DRAG_THRESHOLD_PX, ICON_DATA, TOAST_DURATION, WHEEL_DELTA_UNIT,
-    ZOOM_MAX_NOTCHES_PER_EVENT, ZOOM_PER_NOTCH,
+    ZOOM_MAX_NOTCHES_PER_EVENT, ZOOM_PER_NOTCH, TOOLBAR_AUTO_HIDE_DELAY,
 };
 use crate::gallery::{file_name_of, Gallery};
-use crate::image_io::{apply_display_filter, make_checkerboard, LoadedImage, Rot};
+use crate::image_io::{make_checkerboard, LoadedImage, Rot};
 use crate::platform;
+use crate::toolbar::{Toolbar, ToolbarAction};
 use crate::view::ViewState;
 
 struct Toast {
@@ -31,6 +32,8 @@ pub struct App {
     drag_last: Option<Vec2>,
     /// True once the current press moved past the drag threshold.
     dragging: bool,
+    toolbar: Toolbar,
+    last_mouse_move: f64,
 }
 
 impl App {
@@ -52,6 +55,8 @@ impl App {
             scroll_acc: 0.0,
             drag_last: None,
             dragging: false,
+            toolbar: Toolbar::new(),
+            last_mouse_move: 0.0,
         })
     }
 
@@ -157,6 +162,9 @@ impl App {
                 if self.fullscreen {
                     self.set_toast(self.gallery.title_label(), false);
                 }
+                // Show toolbar briefly when image changes
+                self.toolbar.visible = true;
+                self.last_mouse_move = get_time();
             }
             Err(err) => self.set_toast(format!("[{}] {}", index + 1, err), true),
         }
@@ -192,6 +200,8 @@ impl App {
                         self.update_title();
                         let name = file_name_of(&self.gallery.current_path());
                         self.set_toast(format!("Opened {name}"), false);
+                        self.toolbar.visible = true;
+                        self.last_mouse_move = get_time();
                     }
                     Err(err) => self.set_toast(err, true),
                 }
@@ -370,6 +380,29 @@ impl App {
         let tex_w = self.texture.width();
         let tex_h = self.texture.height();
 
+        // Track mouse movement for toolbar auto-hide
+        let mouse_moved = is_mouse_button_down(MouseButton::Left) || 
+                          (mouse != vec2(mx, my));
+        if mouse_moved {
+            self.last_mouse_move = get_time();
+            self.toolbar.visible = true;
+        }
+
+        // Update toolbar hover
+        self.toolbar.update_hover(mouse);
+
+        // Check toolbar clicks
+        if is_mouse_button_pressed(MouseButton::Left) {
+            if let Some(action) = self.toolbar.handle_click(mouse) {
+                match action {
+                    ToolbarAction::Prev => self.prev_image(),
+                    ToolbarAction::Next => self.next_image(),
+                }
+                // Don't process as image click
+                return true;
+            }
+        }
+
         if is_mouse_button_pressed(MouseButton::Middle) {
             self.reset_view();
         }
@@ -399,139 +432,131 @@ impl App {
             self.drag_last = None;
         }
 
-        if is_mouse_button_released(MouseButton::Left) {
-            if !self.dragging {
-                let now = get_time();
-                if now - self.last_click_time < DOUBLE_CLICK_SECS {
-                    self.reset_view();
-                    self.set_toast("View reset", false);
-                } else if win_w > 0.0 {
-                    if mx < win_w / 3.0 {
-                        self.prev_image();
-                    } else if mx >= win_w * 2.0 / 3.0 {
-                        self.next_image();
-                    }
-                }
+        // Double-click to reset view
+        if is_mouse_button_pressed(MouseButton::Left) && !self.dragging {
+            let now = get_time();
+            if now - self.last_click_time < DOUBLE_CLICK_SECS {
+                self.reset_view();
+                self.set_toast("View reset", false);
+                self.last_click_time = 0.0;
+            } else {
                 self.last_click_time = now;
             }
-            self.dragging = false;
         }
 
-        // Zoom with scroll wheel (one gentle step per notch; Windows sends ±120).
-        let (_, wheel_y) = mouse_wheel();
-        if wheel_y != 0.0 {
-            let mut notches = if wheel_y.abs() >= 10.0 {
-                wheel_y / WHEEL_DELTA_UNIT
-            } else {
-                // Already notch-like (Linux/macOS often ±1).
-                wheel_y
-            };
-            notches = notches.clamp(-ZOOM_MAX_NOTCHES_PER_EVENT, ZOOM_MAX_NOTCHES_PER_EVENT);
-            self.scroll_acc += notches;
-            // Apply whole notches; keep fractional remainder for high-res / trackpad wheels.
-            let whole = self.scroll_acc.trunc();
-            if whole != 0.0 {
-                self.scroll_acc -= whole;
-                let factor = ZOOM_PER_NOTCH.powf(whole);
-                self.view.zoom_at_mouse(factor, mouse, tex_w, tex_h, win_w, win_h);
-                let percent = (self.view.zoom_target * 100.0).round() as i32;
-                self.set_toast(format!("{percent}%"), false);
+        // Mouse wheel: zoom at cursor position
+        let wheel = mouse_wheel();
+        if wheel.1 != 0.0 {
+            self.scroll_acc += wheel.1 * WHEEL_DELTA_UNIT;
+            let notches = (self.scroll_acc / WHEEL_DELTA_UNIT).round();
+            if notches != 0.0 {
+                let clamped = notches.clamp(-ZOOM_MAX_NOTCHES_PER_EVENT, ZOOM_MAX_NOTCHES_PER_EVENT);
+                let factor = ZOOM_PER_NOTCH.powf(clamped);
+                self.view
+                    .zoom_at_mouse(factor, mouse, tex_w, tex_h, win_w, win_h);
+                self.scroll_acc -= clamped * WHEEL_DELTA_UNIT;
             }
+        } else {
+            self.scroll_acc = 0.0;
+        }
+
+        // Auto-hide toolbar after inactivity
+        if self.toolbar.visible && get_time() - self.last_mouse_move > TOOLBAR_AUTO_HIDE_DELAY {
+            self.toolbar.visible = false;
+        }
+
+        // Show toolbar on any mouse movement
+        if get_time() - self.last_mouse_move < 0.5 {
+            self.toolbar.visible = true;
         }
 
         true
     }
 
     fn draw_overlay(&self) {
-        let font_size = 18.0;
-        let pad = 6.0;
-        let margin = 10.0;
-
-        // Toast (errors / save confirmations) at the bottom-left corner
         if let Some(toast) = &self.toast {
             if get_time() < toast.deadline {
-                let dims = measure_text(&toast.message, None, font_size as u16, 1.0);
-                let w = dims.width + pad * 2.0;
-                let h = font_size + pad * 2.0;
-                let y = screen_height() - margin - h;
-                draw_rectangle(margin, y, w, h, Color::new(0.0, 0.0, 0.0, 0.65));
+                let msg = &toast.message;
+                let dims = measure_text(msg, None, 24, 1.0);
+                let padding = 20.0;
+                let margin = 20.0;
+                let w = dims.width + padding * 2.0;
+                let h = dims.height + padding * 2.0;
+                let x = (screen_width() - w) / 2.0;
+                let y = screen_height() - h - margin;
+                draw_rectangle(x, y, w, h, Color::new(0.0, 0.0, 0.0, 0.65));
                 draw_text(
-                    &toast.message,
-                    margin + pad,
-                    y + pad + font_size * 0.8,
-                    font_size,
-                    if toast.is_error {
-                        Color::new(1.0, 0.45, 0.45, 1.0)
-                    } else {
-                        Color::new(0.55, 1.0, 0.55, 1.0)
-                    },
+                    msg,
+                    x + padding,
+                    y + padding + dims.height * 0.8,
+                    24.0,
+                    if toast.is_error { RED } else { WHITE },
                 );
             }
         }
     }
 
-    /// Tiles the checkerboard pattern across `region`, clipped exactly to it.
     fn draw_checkerboard(&self, region: Rect) {
-        let ts = self.checker.width();
-        if ts <= 0.0 || region.w <= 0.0 || region.h <= 0.0 {
+        // Only draw checkerboard if the image has transparency
+        if !self.image.has_transparency() {
             return;
         }
-        let end_x = region.x + region.w;
-        let end_y = region.y + region.h;
-        let mut ty = (region.y / ts).floor() * ts;
-        while ty < end_y {
-            let mut tx = (region.x / ts).floor() * ts;
-            while tx < end_x {
-                let vx = tx.max(region.x);
-                let vy = ty.max(region.y);
-                let vr = (tx + ts).min(end_x);
-                let vb = (ty + ts).min(end_y);
+
+        let mut x = region.x;
+        let mut y = region.y;
+        let tile = 16.0;
+        let mut odd = false;
+        while y < region.y + region.h {
+            while x < region.x + region.w {
+                let tile_rect = Rect::new(x, y, tile, tile);
                 draw_texture_ex(
                     &self.checker,
-                    vx,
-                    vy,
+                    tile_rect.x,
+                    tile_rect.y,
                     WHITE,
                     DrawTextureParams {
-                        source: Some(Rect {
-                            x: vx - tx,
-                            y: vy - ty,
-                            w: vr - vx,
-                            h: vb - vy,
-                        }),
+                        dest_size: Some(vec2(tile_rect.w, tile_rect.h)),
                         ..Default::default()
                     },
                 );
-                tx += ts;
+                x += tile;
             }
-            ty += ts;
+            odd = !odd;
+            x = region.x - if odd { 0.0 } else { tile / 2.0 };
+            y += tile;
         }
     }
 
     pub fn update(&mut self) -> bool {
-        self.handle_dropped_files();
         self.sync_window_state();
+        self.handle_dropped_files();
+
         if !self.handle_input() {
             return false;
         }
 
-        self.view.tick_zoom(get_frame_time());
-        self.view.clamp_pan(
-            self.texture.width(),
-            self.texture.height(),
-            screen_width(),
-            screen_height(),
-        );
+        let dt = get_frame_time();
+        self.view.tick_zoom(dt);
 
+        // Update toolbar button positions
+        let win_w = screen_width();
+        let win_h = screen_height();
+        self.toolbar.update_buttons(win_w, win_h);
+
+        // Clear and draw
         clear_background(BLACK);
 
-        let rect = self.view.view_rect(
-            self.texture.width(),
-            self.texture.height(),
-            screen_width(),
-            screen_height(),
-        );
+        let win_w = screen_width();
+        let win_h = screen_height();
+        let tex_w = self.texture.width();
+        let tex_h = self.texture.height();
+
+        // Fullscreen color background
+        clear_background(BLACK);
+
+        // Draw checkerboard, texture, overlay
+        let rect = self.view.view_rect(tex_w, tex_h, win_w, win_h);
         self.draw_checkerboard(rect);
-        apply_display_filter(&self.texture, rect.w, rect.h);
         draw_texture_ex(
             &self.texture,
             rect.x,
@@ -539,11 +564,18 @@ impl App {
             WHITE,
             DrawTextureParams {
                 dest_size: Some(vec2(rect.w, rect.h)),
-                ..Default::default()
+                source: None,
+                rotation: 0.0,
+                flip_x: false,
+                flip_y: false,
+                pivot: None,
             },
         );
 
+        // Draw toolbar on top of everything
+        self.toolbar.draw(win_w, win_h);
         self.draw_overlay();
+
         true
     }
 }

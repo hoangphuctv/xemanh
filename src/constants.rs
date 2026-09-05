@@ -1,10 +1,8 @@
 pub const IMAGE_EXTENSIONS: [&str; 9] = [
     "jpg", "jpeg", "jpe", "jfif", "png", "bmp", "dib", "gif", "tga",
 ];
-pub const JPEG_SAVE_QUALITY: u8 = 100;
 pub const TOAST_DURATION: f64 = 1.2;
 pub const DOUBLE_CLICK_SECS: f64 = 0.35;
-pub const CHECKER_TILE_PX: u16 = 16;
 pub const ICON_DATA: &[u8] = include_bytes!("../assets/xemanh.ico");
 
 /// Scale multiplier applied per mouse-wheel notch (~5.5%).
@@ -23,3 +21,5 @@ pub const WINDOW_MIN_PORTRAIT_H: f32 = 800.0;
 pub const WHEEL_DELTA_UNIT: f32 = 120.0;
 /// Cap notches processed from a single wheel burst (trackpad flicks).
 pub const ZOOM_MAX_NOTCHES_PER_EVENT: f32 = 2.0;
+/// Time in seconds to auto-hide toolbar after inactivity
+pub const TOOLBAR_AUTO_HIDE_DELAY: f64 = 2.5;
