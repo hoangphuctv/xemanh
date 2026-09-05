@@ -1,6 +1,6 @@
 [package]
 name = "xemanh"
-version = "0.1.7"
+version = "0.1.9"
 edition = "2024"
 description = "Lightweight image viewer"
 authors = ["hoangphuctv"]

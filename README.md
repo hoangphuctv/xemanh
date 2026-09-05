@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="releases/latest/download/xemanh-0.1.7-setup.exe">Tải bản cài Windows</a>
+  <a href="releases/latest/download/xemanh-0.1.9-setup.exe">Tải bản cài Windows</a>
   · Windows 10 / 11
   &nbsp;·&nbsp;
   <a href="releases/latest">Tải bản .deb Linux</a>
@@ -38,7 +38,7 @@ Double-click file ảnh → cửa sổ vừa khít tấm hình → lướt sang 
 
 ### Windows
 
-1. Tải [bản cài Windows mới nhất](releases/latest/download/xemanh-0.1.7-setup.exe)
+1. Tải [bản cài Windows mới nhất](releases/latest/download/xemanh-0.1.9-setup.exe)
 2. Chạy file cài đặt (không cần quyền Administrator)
 3. Double-click bất kỳ ảnh nào để mở bằng XemAnh
 
