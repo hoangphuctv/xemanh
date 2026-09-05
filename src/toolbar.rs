@@ -17,6 +17,9 @@ pub struct ToolbarButton {
 pub enum ToolbarAction {
     Prev,
     Next,
+    ZoomIn,
+    ZoomOut,
+    ResetView,
 }
 
 impl Toolbar {
@@ -29,19 +32,25 @@ impl Toolbar {
     }
 
     pub fn update_buttons(&mut self, win_w: f32, _win_h: f32) {
-        let count = 2;
-        let spacing = 8.0;
-        let button_w = 64.0;
-        let button_h = 48.0;
+        let count = 5;
+        let spacing = 6.0;
+        let button_w = 48.0;
+        let button_h = 36.0;
         let total_w = count as f32 * button_w + (count - 1) as f32 * spacing;
         let start_x = (win_w - total_w) / 2.0;
-        let y = 16.0;
+        let y = 12.0;
 
         self.buttons.clear();
-        
-        let actions = [ToolbarAction::Prev, ToolbarAction::Next];
-        let labels = ["<", ">"];
-        
+
+        let actions = [
+            ToolbarAction::Prev,
+            ToolbarAction::ZoomOut,
+            ToolbarAction::ResetView,
+            ToolbarAction::ZoomIn,
+            ToolbarAction::Next,
+        ];
+        let labels = ["<", "-", "R", "+", ">"];
+
         for (i, (&action, &label)) in actions.iter().zip(labels.iter()).enumerate() {
             let x = start_x + i as f32 * (button_w + spacing);
             self.buttons.push(ToolbarButton {
@@ -62,7 +71,7 @@ impl Toolbar {
         let btn_hover_color = Color::new(0.5, 0.5, 0.5, 0.9);
         let text_color = WHITE;
 
-        let bar_h = 72.0;
+        let bar_h = 56.0;
         draw_rectangle(0.0, 0.0, win_w, bar_h, bg_color);
 
         for (i, btn) in self.buttons.iter().enumerate() {
@@ -71,7 +80,7 @@ impl Toolbar {
             } else {
                 btn_color
             };
-            
+
             draw_rectangle(btn.rect.x, btn.rect.y, btn.rect.w, btn.rect.h, color);
             draw_rectangle_lines(
                 btn.rect.x,
@@ -82,7 +91,7 @@ impl Toolbar {
                 Color::new(1.0, 1.0, 1.0, 0.3),
             );
 
-            let font_size = 32.0;
+            let font_size = 22.0;
             let text_dims = measure_text(btn.label, None, font_size as u16, 1.0);
             let tx = btn.rect.x + (btn.rect.w - text_dims.width) / 2.0;
             let ty = btn.rect.y + (btn.rect.h - text_dims.height) / 2.0 + font_size * 0.3;

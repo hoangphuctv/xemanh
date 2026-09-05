@@ -397,6 +397,22 @@ impl App {
                 match action {
                     ToolbarAction::Prev => self.prev_image(),
                     ToolbarAction::Next => self.next_image(),
+                    ToolbarAction::ZoomIn => {
+                        let factor = ZOOM_PER_NOTCH;
+                        self.view.zoom_at_mouse(factor, mouse, tex_w, tex_h, win_w, win_h);
+                        let percent = (self.view.zoom_target * 100.0).round() as i32;
+                        self.set_toast(format!("{percent}%"), false);
+                    }
+                    ToolbarAction::ZoomOut => {
+                        let factor = 1.0 / ZOOM_PER_NOTCH;
+                        self.view.zoom_at_mouse(factor, mouse, tex_w, tex_h, win_w, win_h);
+                        let percent = (self.view.zoom_target * 100.0).round() as i32;
+                        self.set_toast(format!("{percent}%"), false);
+                    }
+                    ToolbarAction::ResetView => {
+                        self.reset_view();
+                        self.set_toast("View reset", false);
+                    }
                 }
                 // Don't process as image click
                 return true;
