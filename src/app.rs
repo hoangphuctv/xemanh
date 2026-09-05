@@ -79,7 +79,7 @@ impl App {
                 platform::set_icon(self.hwnd, ICON_DATA);
             }
         }
-        let title = format!("{} - XemAnh", self.gallery.title_label());
+        let title = format!("XemAnh — {}", self.gallery.title_label());
         platform::set_title(self.hwnd, &title);
     }
 
@@ -154,8 +154,6 @@ impl App {
                     }
                 }
                 self.update_title();
-                let label = self.gallery.title_label();
-                self.set_toast(label, false);
             }
             Err(err) => self.set_toast(format!("[{}] {}", index + 1, err), true),
         }
@@ -389,6 +387,8 @@ impl App {
                 self.scroll_acc -= whole;
                 let factor = ZOOM_PER_NOTCH.powf(whole);
                 self.view.zoom_at_mouse(factor, mouse, tex_w, tex_h, win_w, win_h);
+                let percent = (self.view.zoom_target * 100.0).round() as i32;
+                self.set_toast(format!("{percent}%"), false);
             }
         }
 

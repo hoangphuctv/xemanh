@@ -124,7 +124,12 @@ pub fn set_title(hwnd: usize, text: &str) {
     unsafe { SetWindowTextW(hwnd as *mut _, wide.as_ptr()) };
 }
 
-#[cfg(not(target_os = "windows"))]
+#[cfg(target_os = "macos")]
+pub fn set_title(_hwnd: usize, text: &str) {
+    crate::platform::macos::set_title(text);
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
 pub fn set_title(_hwnd: usize, _text: &str) {}
 
 #[cfg(target_os = "windows")]
