@@ -9,7 +9,6 @@ if %errorlevel% equ 0 (
     ) else (
         echo [ERROR] Cargo was not found in your PATH or under %USERPROFILE%\.cargo\bin\cargo.exe.
         echo Please ensure Rust is installed correctly.
-        pause
         exit /b 1
     )
 )
@@ -20,4 +19,3 @@ if %errorlevel% equ 0 (
 ) else (
     echo [ERROR] Build failed.
 )
-pause

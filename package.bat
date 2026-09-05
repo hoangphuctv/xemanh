@@ -17,14 +17,12 @@ if %errorlevel% equ 0 (
         "%USERPROFILE%\.cargo\bin\cargo.exe" build --release
     ) else (
         echo [ERROR] Cargo not found.
-        pause
         exit /b 1
     )
 )
 
 if %errorlevel% neq 0 (
     echo [ERROR] Build failed.
-    pause
     exit /b 1
 )
 echo [OK] Release build succeeded.
@@ -35,7 +33,6 @@ echo [1c/3] Building default-association helper...
 cargo build --release --manifest-path "packaging\windows\set-default-assoc\Cargo.toml"
 if %errorlevel% neq 0 (
     echo [ERROR] Failed to build xemanh-set-default.exe
-    pause
     exit /b 1
 )
 echo.
@@ -45,7 +42,6 @@ echo [1b/3] Embedding application icon...
 powershell -NoProfile -ExecutionPolicy Bypass -File "stamp-icon.ps1" -ExePath "target\release\xemanh.exe"
 if %errorlevel% neq 0 (
     echo [ERROR] Failed to embed icon.
-    pause
     exit /b 1
 )
 echo.
@@ -53,7 +49,6 @@ echo.
 :: Step 2: Verify exe exists
 if not exist "target\release\xemanh.exe" (
     echo [ERROR] target\release\xemanh.exe not found.
-    pause
     exit /b 1
 )
 
@@ -62,14 +57,12 @@ echo [2/3] Creating installer with Inno Setup...
 if not exist "%ISCC%" (
     echo [ERROR] Inno Setup not found at: %ISCC%
     echo Please install Inno Setup 6 from https://jrsoftware.org/isinfo.php
-    pause
     exit /b 1
 )
 
 "%ISCC%" "installer.iss"
 if %errorlevel% neq 0 (
     echo [ERROR] Inno Setup failed.
-    pause
     exit /b 1
 )
 echo [OK] Installer created.

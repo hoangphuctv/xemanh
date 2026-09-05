@@ -50,6 +50,8 @@ if (Test-Path "README.md") {
     Set-Content "README.md" -Value $readme -NoNewline
 }
 
+$env:APP_VERSION = $newVer
+
 # 3. Build Windows Release & Installer
 Write-Host "==> Building Windows Binary & Installer..." -ForegroundColor Yellow
 & cmd.exe /c "build-release.bat"
@@ -64,7 +66,12 @@ if (Test-Path "package.bat") {
 Write-Host "==> Building Linux .deb via WSL..." -ForegroundColor Yellow
 where.exe wsl >$null 2>&1
 if ($LASTEXITCODE -eq 0) {
-    wsl bash -c "chmod +x ./package-deb.sh && ./package-deb.sh"
+    if ($PSScriptRoot) {
+        $projectDir = Split-Path -Parent $PSScriptRoot
+    } else {
+        $projectDir = (Get-Location).Path
+    }
+    wsl --cd "$projectDir" bash -c "sed -i 's/\r$//' ./package-deb.sh 2>/dev/null || true; ./package-deb.sh"
     if ($LASTEXITCODE -ne 0) {
         Write-Warning "WSL package-deb.sh failed or completed with non-zero code."
     }
@@ -87,8 +94,10 @@ if ($LASTEXITCODE -eq 0) {
     $assets = @()
     $winSetup = "xemanh-$newVer-setup.exe"
     if (Test-Path $winSetup) { $assets += $winSetup }
+    $winSetupInDir = "installer\xemanh-$newVer-setup.exe"
+    if (Test-Path $winSetupInDir) { $assets += $winSetupInDir }
     
-    $debFiles = Get-ChildItem -Filter "xemanh_${newVer}_*.deb"
+    $debFiles = Get-ChildItem -Path "installer", "." -Filter "xemanh_${newVer}_*.deb" -ErrorAction SilentlyContinue
     foreach ($f in $debFiles) { $assets += $f.FullName }
 
     if ($assets.Count -gt 0) {

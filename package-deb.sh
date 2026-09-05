@@ -7,17 +7,21 @@ cd "$ROOT"
 
 need() {
   command -v "$1" >/dev/null 2>&1 || {
-    echo "[ERROR] Missing tool: $1" >&2
+    echo "[ERROR] Missing tool: $1 (hint: $2)" >&2
     exit 1
   }
 }
 
-need cargo
-need dpkg-deb
-need fakeroot
-need strip
+if [[ -f "$HOME/.cargo/env" ]]; then
+  source "$HOME/.cargo/env"
+fi
 
-VERSION="$(sed -n 's/^version = "\([^"]*\)"/\1/p' Cargo.toml | head -1)"
+need cargo "rustup / cargo (curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh)"
+need dpkg-deb "dpkg (apt install dpkg)"
+need fakeroot "fakeroot (apt install fakeroot)"
+need strip "binutils (apt install binutils)"
+
+VERSION="$(sed -n 's/^version = "\([^"]*\)"/\1/p' Cargo.toml | head -1 | tr -d '\r')"
 ARCH="$(dpkg --print-architecture)"
 PKG_NAME="xemanh"
 DEB_NAME="${PKG_NAME}_${VERSION}_${ARCH}.deb"
@@ -110,12 +114,21 @@ exit 0
 EOF
 
 chmod 755 "$STAGE/DEBIAN/postinst" "$STAGE/DEBIAN/postrm"
+chmod 755 "$STAGE/DEBIAN"
+chmod 644 "$STAGE/DEBIAN"/*
+chmod 755 "$STAGE/DEBIAN/postinst" "$STAGE/DEBIAN/postrm"
 echo "[OK] Staged under target/deb-root/"
 echo
 
 echo "[3/4] Building .deb with fakeroot + dpkg-deb..."
 mkdir -p "$OUT_DIR"
-fakeroot dpkg-deb --root-owner-group --build "$STAGE" "${OUT_DIR}/${DEB_NAME}"
+TMP_BUILD_DIR="$(mktemp -d /tmp/deb-build.XXXXXX)"
+cp -a "$STAGE/." "$TMP_BUILD_DIR/"
+chmod -R 755 "$TMP_BUILD_DIR/DEBIAN"
+chmod 644 "$TMP_BUILD_DIR/DEBIAN"/* 2>/dev/null || true
+chmod 755 "$TMP_BUILD_DIR/DEBIAN/postinst" "$TMP_BUILD_DIR/DEBIAN/postrm" 2>/dev/null || true
+fakeroot dpkg-deb --root-owner-group --build "$TMP_BUILD_DIR" "${OUT_DIR}/${DEB_NAME}"
+rm -rf "$TMP_BUILD_DIR"
 echo "[OK] Created ${OUT_DIR}/${DEB_NAME}"
 echo
 
