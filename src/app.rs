@@ -405,6 +405,12 @@ impl App {
                 if now - self.last_click_time < DOUBLE_CLICK_SECS {
                     self.reset_view();
                     self.set_toast("View reset", false);
+                } else if win_w > 0.0 {
+                    if mx < win_w / 3.0 {
+                        self.prev_image();
+                    } else if mx >= win_w * 2.0 / 3.0 {
+                        self.next_image();
+                    }
                 }
                 self.last_click_time = now;
             }
