@@ -1,0 +1,10 @@
+C:\Users\phucth.568E-local\Desktop\XA\packaging\windows\set-default-assoc\target\release\deps\md5-4baad6d8d2b7af6f.d: C:\Users\phucth.568E-local\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\md-5-0.10.6\src\lib.rs C:\Users\phucth.568E-local\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\md-5-0.10.6\src\compress.rs C:\Users\phucth.568E-local\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\md-5-0.10.6\src\consts.rs C:\Users\phucth.568E-local\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\md-5-0.10.6\src\compress\soft.rs
+
+C:\Users\phucth.568E-local\Desktop\XA\packaging\windows\set-default-assoc\target\release\deps\libmd5-4baad6d8d2b7af6f.rlib: C:\Users\phucth.568E-local\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\md-5-0.10.6\src\lib.rs C:\Users\phucth.568E-local\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\md-5-0.10.6\src\compress.rs C:\Users\phucth.568E-local\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\md-5-0.10.6\src\consts.rs C:\Users\phucth.568E-local\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\md-5-0.10.6\src\compress\soft.rs
+
+C:\Users\phucth.568E-local\Desktop\XA\packaging\windows\set-default-assoc\target\release\deps\libmd5-4baad6d8d2b7af6f.rmeta: C:\Users\phucth.568E-local\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\md-5-0.10.6\src\lib.rs C:\Users\phucth.568E-local\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\md-5-0.10.6\src\compress.rs C:\Users\phucth.568E-local\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\md-5-0.10.6\src\consts.rs C:\Users\phucth.568E-local\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\md-5-0.10.6\src\compress\soft.rs
+
+C:\Users\phucth.568E-local\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\md-5-0.10.6\src\lib.rs:
+C:\Users\phucth.568E-local\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\md-5-0.10.6\src\compress.rs:
+C:\Users\phucth.568E-local\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\md-5-0.10.6\src\consts.rs:
+C:\Users\phucth.568E-local\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\md-5-0.10.6\src\compress\soft.rs:

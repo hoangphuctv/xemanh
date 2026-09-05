@@ -319,8 +319,8 @@ impl App {
             self.delete_current();
         }
 
-        // Reset view: 0 or double-click (click = no drag)
-        if is_key_pressed(KeyCode::Key0) {
+        // Reset view: 0 / Numpad 0 or double-click (click = no drag)
+        if is_key_pressed(KeyCode::Key0) || is_key_pressed(KeyCode::Kp0) {
             self.reset_view();
             self.set_toast("View reset", false);
         }
