@@ -9,3 +9,6 @@
 *.sw?
 installer/*.deb
 installer/*.exe
+.bridge-output/
+output.txt
+*.log
