@@ -148,3 +148,17 @@ pub fn set_window_frame(logical_w: f32, logical_h: f32) {
         let _: () = msg_send![window, setFrame:frame display:true animate:false];
     }
 }
+
+pub fn set_title(text: &str) {
+    unsafe {
+        let window = app_window();
+        if window.is_null() {
+            return;
+        }
+        let cls = class!(NSString);
+        let alloc: ObjcId = msg_send![cls, alloc];
+        let string: ObjcId = msg_send![alloc, initWithBytes:text.as_ptr() length:text.len() encoding:4usize];
+        let _: () = msg_send![window, setTitle:string];
+        let _: () = msg_send![string, release];
+    }
+}
