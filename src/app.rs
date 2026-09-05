@@ -154,6 +154,9 @@ impl App {
                     }
                 }
                 self.update_title();
+                if self.fullscreen {
+                    self.set_toast(self.gallery.title_label(), false);
+                }
             }
             Err(err) => self.set_toast(format!("[{}] {}", index + 1, err), true),
         }
