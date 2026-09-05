@@ -34,7 +34,7 @@ impl Toolbar {
     pub fn update_buttons(&mut self, win_w: f32, _win_h: f32) {
         let count = 5;
         let spacing = 6.0;
-        let button_w = 48.0;
+        let button_w = 56.0;
         let button_h = 36.0;
         let total_w = count as f32 * button_w + (count - 1) as f32 * spacing;
         let start_x = (win_w - total_w) / 2.0;
@@ -44,12 +44,12 @@ impl Toolbar {
 
         let actions = [
             ToolbarAction::Prev,
+            ToolbarAction::Next,
             ToolbarAction::ZoomOut,
             ToolbarAction::ResetView,
             ToolbarAction::ZoomIn,
-            ToolbarAction::Next,
         ];
-        let labels = ["<", "-", "R", "+", ">"];
+        let labels = ["<", ">", "-", "100%", "+"];
 
         for (i, (&action, &label)) in actions.iter().zip(labels.iter()).enumerate() {
             let x = start_x + i as f32 * (button_w + spacing);
@@ -91,7 +91,7 @@ impl Toolbar {
                 Color::new(1.0, 1.0, 1.0, 0.3),
             );
 
-            let font_size = 22.0;
+            let font_size = 20.0;
             let text_dims = measure_text(btn.label, None, font_size as u16, 1.0);
             let tx = btn.rect.x + (btn.rect.w - text_dims.width) / 2.0;
             let ty = btn.rect.y + (btn.rect.h - text_dims.height) / 2.0 + font_size * 0.3;
