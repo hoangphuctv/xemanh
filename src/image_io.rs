@@ -1,10 +1,11 @@
+---
 use std::fs::File;
 use std::io::{BufReader, Cursor};
 use std::path::Path;
 use std::time::Duration;
 
 use image::codecs::gif::GifDecoder;
-use image::{AnimationDecoder, DynamicImage, ImageOutputFormat, RgbaImage};
+use image::{AnimationDecoder, DynamicImage, ImageOutputFormat, GenericImageView, RgbaImage};
 use macroquad::prelude::*;
 
 pub struct ImageAnimation {
@@ -130,10 +131,6 @@ impl LoadedImage {
         self.animation.as_mut()
     }
 
-    pub fn has_transparency(&self) -> bool {
-        self.has_transparency
-    }
-
     pub fn png_bytes(&self) -> Result<Vec<u8>, String> {
         let mut bytes = Vec::new();
         self.inner
@@ -148,35 +145,61 @@ impl LoadedImage {
             .map_err(|e| format!("Failed to save {}: {}", self.path, e))
     }
 
+    pub fn save_to_path(&self, target_path: &Path) -> Result<(), String> {
+        self.inner
+            .save(target_path)
+            .map_err(|e| format!("Failed to save {}: {}", target_path.display(), e))
+    }
+
     pub fn rotate(&mut self, rot: Rot) {
         if let Rot::Cw = rot {
             self.inner = self.inner.rotate90();
         } else if let Rot::Ccw = rot {
             self.inner = self.inner.rotate270();
+        } else {
+            return;
         }
         self.rgba = self.inner.to_rgba8();
-        self.has_transparency = Self::check_transparency(&self.rgba);
+        self.animation = None;
+    }
+
+    pub fn crop(&mut self, x: u32, y: u32, width: u32, height: u32) {
+        if width == 0 || height == 0 {
+            return;
+        }
+        let (img_w, img_h) = self.inner.dimensions();
+        let x = x.min(img_w.saturating_sub(1));
+        let y = y.min(img_h.saturating_sub(1));
+        let width = width.min(img_w - x);
+        let height = height.min(img_h - y);
+
+        if width == 0 || height == 0 {
+            return;
+        }
+
+        self.inner = self.inner.crop_imm(x, y, width, height);
+        self.rgba = self.inner.to_rgba8();
+        self.animation = None;
     }
 }
 
 pub fn make_checkerboard() -> Texture2D {
-    let tile = 16;
-    let size = tile * 2;
-    let mut pixels = vec![0u8; (size * size * 4) as usize];
+    let size = 16;
+    let mut pixels = vec![0u8; size * size * 4];
+    let c1 = [204u8, 204u8, 204u8, 255u8];
+    let c2 = [255u8, 255u8, 255u8, 255u8];
+
     for y in 0..size {
         for x in 0..size {
-            let idx = ((y * size + x) * 4) as usize;
-            let gray = if (x / tile + y / tile) % 2 == 0 { 42 } else { 28 };
-            pixels[idx] = gray;
-            pixels[idx + 1] = gray;
-            pixels[idx + 2] = gray;
-            pixels[idx + 3] = 255;
+            let is_even = (x / 8 + y / 8) % 2 == 0;
+            let color = if is_even { c1 } else { c2 };
+            let idx = (y * size + x) * 4;
+            pixels[idx] = color[0];
+            pixels[idx + 1] = color[1];
+            pixels[idx + 2] = color[2];
+            pixels[idx + 3] = color[3];
         }
     }
-    let texture = Texture2D::from_rgba8(size as u16, size as u16, &pixels);
-    if texture.width() == 0.0 || texture.height() == 0.0 {
-        Texture2D::from_rgba8(1, 1, &[255, 255, 255, 255])
-    } else {
-        texture
-    }
+
+    Texture2D::from_rgba8(size as u16, size as u16, &pixels)
 }

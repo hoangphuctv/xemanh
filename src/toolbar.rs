@@ -21,6 +21,7 @@ pub struct ToolbarButton {
 pub enum ToolbarAction {
     Prev,
     Next,
+    Crop,
     ZoomIn,
     ZoomOut,
     ResetView,
@@ -50,7 +51,7 @@ impl Toolbar {
             btn_h,
         );
 
-        let count = 5;
+        let count = 6;
         let spacing = 6.0;
         let button_w = 56.0;
         let total_w = count as f32 * button_w + (count - 1) as f32 * spacing;
@@ -63,13 +64,14 @@ impl Toolbar {
         }
 
         let actions = [
+            ToolbarAction::Crop,
             ToolbarAction::Prev,
             ToolbarAction::Next,
             ToolbarAction::ZoomOut,
             ToolbarAction::ResetView,
             ToolbarAction::ZoomIn,
         ];
-        let labels = ["<", ">", "-", "100%", "+"];
+        let labels = ["Crop", "<", ">", "-", "100%", "+"];
 
         for (i, (&action, &label)) in actions.iter().zip(labels.iter()).enumerate() {
             let x = start_x + i as f32 * (button_w + spacing);
@@ -79,6 +81,44 @@ impl Toolbar {
                 rect: Rect::new(x, y, button_w, btn_h),
             });
         }
+    }
+
+    pub fn update_hover(&mut self, mouse_pos: Vec2) {
+        self.toggle_hovered = self.toggle_rect.contains(mouse_pos);
+        self.hovered = None;
+
+        if !self.visible {
+            return;
+        }
+
+        for (i, btn) in self.buttons.iter().enumerate() {
+            if btn.rect.contains(mouse_pos) {
+                self.hovered = Some(i);
+                break;
+            }
+        }
+    }
+
+    pub fn handle_toggle_click(&mut self, mouse_pos: Vec2) -> bool {
+        if self.toggle_rect.contains(mouse_pos) {
+            self.visible = !self.visible;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn handle_click(&self, mouse_pos: Vec2) -> Option<ToolbarAction> {
+        if !self.visible {
+            return None;
+        }
+
+        for btn in &self.buttons {
+            if btn.rect.contains(mouse_pos) {
+                return Some(btn.action);
+            }
+        }
+        None
     }
 
     pub fn draw(&self, win_w: f32, _win_h: f32) {
@@ -137,11 +177,29 @@ impl Toolbar {
                 border_color,
             );
 
-            let font_size = 18.0;
-            let text_dims = measure_text(btn.label, None, font_size as u16, 1.0);
-            let tx = btn.rect.x + (btn.rect.w - text_dims.width) / 2.0;
-            let ty = btn.rect.y + (btn.rect.h - text_dims.height) / 2.0 + font_size * 0.35;
-            draw_text(btn.label, tx, ty, font_size, text_color);
+            if btn.action == ToolbarAction::Crop {
+                // Draw custom crop icon (scissors / frame icon) directly with vector lines
+                let icon_color = text_color;
+                let cx = btn.rect.x + btn.rect.w / 2.0;
+                let cy = btn.rect.y + btn.rect.h / 2.0;
+                let sz = 6.0;
+
+                // Outer crop frame corners
+                draw_line(cx - sz, cy - sz, cx + sz, cy - sz, 2.0, icon_color);
+                draw_line(cx + sz, cy - sz, cx + sz, cy + sz, 2.0, icon_color);
+                draw_line(cx + sz, cy + sz, cx - sz, cy + sz, 2.0, icon_color);
+                draw_line(cx - sz, cy + sz, cx - sz, cy - sz, 2.0, icon_color);
+                
+                // Extending crop marks
+                draw_line(cx - sz - 3.0, cy - sz, cx - sz, cy - sz, 1.5, icon_color);
+                draw_line(cx + sz + 3.0, cy + sz, cx + sz, cy + sz, 1.5, icon_color);
+            } else {
+                let font_size = 18.0;
+                let text_dims = measure_text(btn.label, None, font_size as u16, 1.0);
+                let tx = btn.rect.x + (btn.rect.w - text_dims.width) / 2.0;
+                let ty = btn.rect.y + (btn.rect.h - text_dims.height) / 2.0 + font_size * 0.35;
+                draw_text(btn.label, tx, ty, font_size, text_color);
+            }
         }
 
         // Draw toggle button (^ to hide)
@@ -171,35 +229,5 @@ impl Toolbar {
         let tx = self.toggle_rect.x + (self.toggle_rect.w - dims.width) / 2.0;
         let ty = self.toggle_rect.y + (self.toggle_rect.h - dims.height) / 2.0 + font_size * 0.35;
         draw_text(label, tx, ty, font_size, text_color);
-    }
-
-    pub fn handle_toggle_click(&mut self, mouse: Vec2) -> bool {
-        if self.toggle_rect.contains(mouse) {
-            self.visible = !self.visible;
-            true
-        } else {
-            false
-        }
-    }
-
-    pub fn handle_click(&mut self, mouse: Vec2) -> Option<ToolbarAction> {
-        if !self.visible {
-            return None;
-        }
-        for btn in &self.buttons {
-            if btn.rect.contains(mouse) {
-                return Some(btn.action);
-            }
-        }
-        None
-    }
-
-    pub fn update_hover(&mut self, mouse: Vec2) {
-        self.toggle_hovered = self.toggle_rect.contains(mouse);
-        if self.visible {
-            self.hovered = self.buttons.iter().position(|btn| btn.rect.contains(mouse));
-        } else {
-            self.hovered = None;
-        }
     }
 }

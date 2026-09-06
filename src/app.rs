@@ -1,3 +1,5 @@
+---
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use macroquad::prelude::*;
@@ -18,6 +20,39 @@ struct Toast {
     deadline: f64,
 }
 
+#[derive(Default)]
+pub struct CropState {
+    pub active: bool,
+    pub start_pos: Option<Vec2>,
+    pub current_pos: Vec2,
+    pub dragging: bool,
+}
+
+impl CropState {
+    pub fn reset(&mut self) {
+        self.active = false;
+        self.start_pos = None;
+        self.current_pos = Vec2::ZERO;
+        self.dragging = false;
+    }
+
+    pub fn get_selection_rect(&self) -> Option<Rect> {
+        let start = self.start_pos?;
+        let min_x = start.x.min(self.current_pos.x);
+        let min_y = start.y.min(self.current_pos.y);
+        let max_x = start.x.max(self.current_pos.x);
+        let max_y = start.y.max(self.current_pos.y);
+        let w = max_x - min_x;
+        let h = max_y - min_y;
+
+        if w > 2.0 && h > 2.0 {
+            Some(Rect::new(min_x, min_y, w, h))
+        } else {
+            None
+        }
+    }
+}
+
 pub struct App {
     gallery: Gallery,
     image: LoadedImage,
@@ -36,6 +71,7 @@ pub struct App {
     dragging: bool,
     toolbar: Toolbar,
     last_mouse_move: f64,
+    crop_state: CropState,
 }
 
 impl App {
@@ -59,6 +95,7 @@ impl App {
             dragging: false,
             toolbar: Toolbar::new(),
             last_mouse_move: 0.0,
+            crop_state: CropState::default(),
         })
     }
 
@@ -124,12 +161,11 @@ impl App {
             Ok((img, texture))
         }) {
             Ok((image, texture)) => {
+                self.crop_state.reset();
                 self.gallery.index = index;
                 self.image = image;
                 self.texture = texture;
                 self.reset_view();
-                // Never resize while fullscreen or maximized: it breaks the window
-                // state and desynchronizes the GL viewport from the window.
                 if !self.fullscreen && !platform::is_zoomed(self.hwnd) {
                     let current_w = screen_width();
                     let current_h = screen_height();
@@ -140,20 +176,13 @@ impl App {
                         dpi,
                     );
 
-                    // If the current window is already larger than or equal to the target size for the new image,
-                    // we don't need to shrink or change the window size at all.
                     if current_w < w_img || current_h < h_img {
-                        // The new image target is larger in at least one dimension.
-                        // We grow the window to fit it, but we clamp the target to the screen limits.
                         let mut w_target = w_img.max(current_w);
                         let mut h_target = h_img.max(current_h);
 
-                        // Clamp to screen limits
                         let (clamped_w, clamped_h) =
                             platform::clamp_window_target(w_target, h_target, dpi);
 
-                        // If the user had already manually stretched the window to be larger than clamped limits,
-                        // we preserve their manually set size instead of forcing it to shrink.
                         w_target = clamped_w.max(current_w);
                         h_target = clamped_h.max(current_h);
 
@@ -164,7 +193,6 @@ impl App {
                 if self.fullscreen {
                     self.set_toast(self.gallery.title_label(), false);
                 }
-                // Show toolbar briefly when image changes
                 self.toolbar.visible = true;
                 self.last_mouse_move = get_time();
             }
@@ -192,6 +220,7 @@ impl App {
                     Ok((img, tex))
                 }) {
                     Ok((image, texture)) => {
+                        self.crop_state.reset();
                         self.gallery = gallery;
                         self.image = image;
                         self.texture = texture;
@@ -290,6 +319,84 @@ impl App {
         }
     }
 
+    fn generate_crop_filename(original_path: &Path) -> PathBuf {
+        let parent = original_path.parent().unwrap_or_else(|| Path::new(""));
+        let stem = original_path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("image");
+        let ext = original_path
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("png");
+
+        let mut count = 1;
+        loop {
+            let candidate_name = format!("{}_crop{}.{}", stem, count, ext);
+            let candidate_path = parent.join(candidate_name);
+            if !candidate_path.exists() {
+                return candidate_path;
+            }
+            count += 1;
+        }
+    }
+
+    fn apply_crop(&mut self) {
+        let Some(crop_rect) = self.crop_state.get_selection_rect() else {
+            self.set_toast("Vùng chọn cắt quá nhỏ", true);
+            return;
+        };
+
+        let win_w = screen_width();
+        let win_h = screen_height();
+        let tex_w = self.texture.width();
+        let tex_h = self.texture.height();
+        let top_offset = if self.toolbar.visible { TOOLBAR_HEIGHT } else { 0.0 };
+        let available_h = if self.toolbar.visible { (win_h - TOOLBAR_HEIGHT).max(1.0) } else { win_h };
+        let img_rect = self.view.view_rect(tex_w, tex_h, win_w, available_h, top_offset);
+
+        // Convert screen crop rect to texture pixel space
+        let rel_x = (crop_rect.x - img_rect.x) / img_rect.w;
+        let rel_y = (crop_rect.y - img_rect.y) / img_rect.h;
+        let rel_w = crop_rect.w / img_rect.w;
+        let rel_h = crop_rect.h / img_rect.h;
+
+        let x = (rel_x * tex_w).round().max(0.0) as u32;
+        let y = (rel_y * tex_h).round().max(0.0) as u32;
+        let w = (rel_w * tex_w).round() as u32;
+        let h = (rel_h * tex_h).round() as u32;
+
+        if w == 0 || h == 0 {
+            self.set_toast("Vùng chọn cắt không hợp lệ", true);
+            return;
+        }
+
+        self.image.crop(x, y, w, h);
+        match self.image.upload_texture() {
+            Ok(new_tex) => {
+                self.texture = new_tex;
+                let current_path = self.gallery.current_path();
+                let new_path = Self::generate_crop_filename(&current_path);
+
+                if let Err(e) = self.image.save_to_path(&new_path) {
+                    self.set_toast(format!("Lỗi lưu ảnh cắt: {}", e), true);
+                    return;
+                }
+
+                // Insert saved crop image to gallery right after current image
+                let insert_idx = self.gallery.index + 1;
+                self.gallery.entries.insert(insert_idx, new_path);
+                self.load_index(insert_idx);
+
+                self.crop_state.reset();
+                self.set_toast("Đã cắt & lưu ảnh thành công!", false);
+            }
+            Err(e) => {
+                self.set_toast(e, true);
+            }
+        }
+    }
+
     /// Deletes the current image to the Recycle Bin and shows the next one.
     fn delete_current(&mut self) {
         if self.gallery.is_empty() {
@@ -305,7 +412,6 @@ impl App {
                         self.update_title();
                         return;
                     }
-                    // Stay at the same position: it now points at the next image.
                     let next = self.gallery.index;
                     self.load_index(next);
                     self.set_toast(format!("Deleted {name}"), false);
@@ -317,12 +423,36 @@ impl App {
 
     /// Handles all input. Returns false when the app should quit.
     fn handle_input(&mut self) -> bool {
-        // Esc exits fullscreen first; a second Esc quits the app.
+        // Esc exits Crop mode first, then fullscreen, then quits app.
         if is_key_pressed(KeyCode::Escape) {
+            if self.crop_state.active {
+                self.crop_state.reset();
+                self.set_toast("Đã hủy cắt ảnh", false);
+                return true;
+            }
             if self.fullscreen {
                 self.toggle_fullscreen();
             } else {
                 return false;
+            }
+        }
+
+        // Enter applies crop if crop mode is active
+        if self.crop_state.active && is_key_pressed(KeyCode::Enter) {
+            self.apply_crop();
+            return true;
+        }
+
+        // Toggle crop mode with 'C' (when Ctrl is not held)
+        if is_key_pressed(KeyCode::C)
+            && !is_key_down(KeyCode::LeftControl)
+            && !is_key_down(KeyCode::RightControl)
+        {
+            self.crop_state.active = !self.crop_state.active;
+            if self.crop_state.active {
+                self.set_toast("Chế độ cắt: Kéo chuột để chọn, Enter để cắt, Esc để hủy", false);
+            } else {
+                self.crop_state.reset();
             }
         }
 
@@ -407,12 +537,19 @@ impl App {
                         let percent = (self.view.zoom_target * 100.0).round() as i32;
                         self.set_toast(format!("{percent}%"), false);
                     }
+                    ToolbarAction::Crop => {
+                        self.crop_state.active = !self.crop_state.active;
+                        if self.crop_state.active {
+                            self.set_toast("Chế độ cắt: Kéo chuột để chọn, Enter để cắt, Esc để hủy", false);
+                        } else {
+                            self.crop_state.reset();
+                        }
+                    }
                     ToolbarAction::ResetView => {
                         self.reset_view();
                         self.set_toast("View reset", false);
                     }
                 }
-                // Don't process as image click
                 return true;
             }
         }
@@ -421,40 +558,65 @@ impl App {
             self.reset_view();
         }
 
-        if is_mouse_button_pressed(MouseButton::Left) {
-            self.drag_last = Some(mouse);
-            self.dragging = false;
-        }
+        // Handle Mouse Input for Crop Mode vs Pan Mode
+        if self.crop_state.active {
+            let top_offset = if self.toolbar.visible { TOOLBAR_HEIGHT } else { 0.0 };
+            let available_h = if self.toolbar.visible { (win_h - TOOLBAR_HEIGHT).max(1.0) } else { win_h };
+            let img_rect = self.view.view_rect(tex_w, tex_h, win_w, available_h, top_offset);
 
-        // Drag to pan when the image is larger than the window (typically after zoom).
-        if is_mouse_button_down(MouseButton::Left) {
-            if let Some(last) = self.drag_last {
-                let delta = mouse - last;
-                if delta.length_squared() > 0.0 {
-                    if delta.length() >= DRAG_THRESHOLD_PX {
-                        self.dragging = true;
-                    }
-                    if self.view.can_pan(tex_w, tex_h, win_w, win_h) {
-                        self.view.pan += delta;
-                        self.view.pan_target += delta;
-                        self.view.clamp_pan(tex_w, tex_h, win_w, win_h);
-                    }
-                    self.drag_last = Some(mouse);
-                }
+            if is_mouse_button_pressed(MouseButton::Left) {
+                let clamped_x = mouse.x.clamp(img_rect.x, img_rect.x + img_rect.w);
+                let clamped_y = mouse.y.clamp(img_rect.y, img_rect.y + img_rect.h);
+                self.crop_state.start_pos = Some(vec2(clamped_x, clamped_y));
+                self.crop_state.current_pos = vec2(clamped_x, clamped_y);
+                self.crop_state.dragging = true;
+            }
+
+            if is_mouse_button_down(MouseButton::Left) && self.crop_state.dragging {
+                let clamped_x = mouse.x.clamp(img_rect.x, img_rect.x + img_rect.w);
+                let clamped_y = mouse.y.clamp(img_rect.y, img_rect.y + img_rect.h);
+                self.crop_state.current_pos = vec2(clamped_x, clamped_y);
+            }
+
+            if is_mouse_button_released(MouseButton::Left) {
+                self.crop_state.dragging = false;
             }
         } else {
-            self.drag_last = None;
-        }
+            if is_mouse_button_pressed(MouseButton::Left) {
+                self.drag_last = Some(mouse);
+                self.dragging = false;
+            }
 
-        // Double-click to reset view
-        if is_mouse_button_pressed(MouseButton::Left) && !self.dragging {
-            let now = get_time();
-            if now - self.last_click_time < DOUBLE_CLICK_SECS {
-                self.reset_view();
-                self.set_toast("View reset", false);
-                self.last_click_time = 0.0;
+            // Drag to pan when the image is larger than the window
+            if is_mouse_button_down(MouseButton::Left) {
+                if let Some(last) = self.drag_last {
+                    let delta = mouse - last;
+                    if delta.length_squared() > 0.0 {
+                        if delta.length() >= DRAG_THRESHOLD_PX {
+                            self.dragging = true;
+                        }
+                        if self.view.can_pan(tex_w, tex_h, win_w, win_h) {
+                            self.view.pan += delta;
+                            self.view.pan_target += delta;
+                            self.view.clamp_pan(tex_w, tex_h, win_w, win_h);
+                        }
+                        self.drag_last = Some(mouse);
+                    }
+                }
             } else {
-                self.last_click_time = now;
+                self.drag_last = None;
+            }
+
+            // Double-click to reset view
+            if is_mouse_button_pressed(MouseButton::Left) && !self.dragging {
+                let now = get_time();
+                if now - self.last_click_time < DOUBLE_CLICK_SECS {
+                    self.reset_view();
+                    self.set_toast("View reset", false);
+                    self.last_click_time = 0.0;
+                } else {
+                    self.last_click_time = now;
+                }
             }
         }
 
@@ -475,6 +637,46 @@ impl App {
         }
 
         true
+    }
+
+    fn draw_crop_overlay(&self, img_rect: Rect) {
+        if !self.crop_state.active {
+            return;
+        }
+
+        let dim_color = Color::new(0.0, 0.0, 0.0, 0.5);
+
+        if let Some(selection) = self.crop_state.get_selection_rect() {
+            // Draw dim overlay in 4 areas around selection box
+            // Top
+            draw_rectangle(img_rect.x, img_rect.y, img_rect.w, selection.y - img_rect.y, dim_color);
+            // Bottom
+            let bottom_y = selection.y + selection.h;
+            draw_rectangle(img_rect.x, bottom_y, img_rect.w, (img_rect.y + img_rect.h) - bottom_y, dim_color);
+            // Left
+            draw_rectangle(img_rect.x, selection.y, selection.x - img_rect.x, selection.h, dim_color);
+            // Right
+            let right_x = selection.x + selection.w;
+            draw_rectangle(right_x, selection.y, (img_rect.x + img_rect.w) - right_x, selection.h, dim_color);
+
+            // Draw selection box border & corners
+            draw_rectangle_lines(selection.x, selection.y, selection.w, selection.h, 2.0, WHITE);
+
+            // Draw corner handles
+            let handle_sz = 6.0;
+            let corners = [
+                (selection.x, selection.y),
+                (selection.x + selection.w, selection.y),
+                (selection.x, selection.y + selection.h),
+                (selection.x + selection.w, selection.y + selection.h),
+            ];
+            for (cx, cy) in corners {
+                draw_rectangle(cx - handle_sz / 2.0, cy - handle_sz / 2.0, handle_sz, handle_sz, WHITE);
+            }
+        } else {
+            // Dim whole image if no selection yet
+            draw_rectangle(img_rect.x, img_rect.y, img_rect.w, img_rect.h, dim_color);
+        }
     }
 
     fn draw_overlay(&self) {
@@ -501,8 +703,7 @@ impl App {
     }
 
     fn draw_checkerboard(&self, region: Rect) {
-        // Only draw checkerboard if the image has transparency
-        if !self.image.has_transparency() {
+        if region.w <= 0.0 || region.h <= 0.0 {
             return;
         }
 
@@ -594,6 +795,11 @@ impl App {
                 pivot: None,
             },
         );
+
+        // Draw crop overlay if in crop mode
+        if self.crop_state.active {
+            self.draw_crop_overlay(rect);
+        }
 
         // Draw toolbar on top of everything
         self.toolbar.draw(win_w, win_h);
