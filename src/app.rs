@@ -520,28 +520,33 @@ impl App {
             return;
         }
 
-        let mut x = region.x;
+        let scale_x = region.w / self.texture.width().max(1.0);
+        let tile = (16.0 * scale_x).max(2.0);
+        let cell = tile / 2.0;
+
         let mut y = region.y;
-        let tile = 16.0;
-        let mut odd = false;
-        while y < region.y + region.h {
-            while x < region.x + region.w {
-                let tile_rect = Rect::new(x, y, tile, tile);
+        let max_y = region.y + region.h;
+        let max_x = region.x + region.w;
+
+        while y < max_y {
+            let cur_h = (max_y - y).min(cell);
+            let mut x = region.x;
+            while x < max_x {
+                let cur_w = (max_x - x).min(cell);
                 draw_texture_ex(
                     &self.checker,
-                    tile_rect.x,
-                    tile_rect.y,
+                    x,
+                    y,
                     WHITE,
                     DrawTextureParams {
-                        dest_size: Some(vec2(tile_rect.w, tile_rect.h)),
+                        dest_size: Some(vec2(cur_w.max(0.1), cur_h.max(0.1))),
+                        source: Some(Rect::new(0.0, 0.0, 16.0, 16.0)),
                         ..Default::default()
                     },
                 );
-                x += tile;
+                x += cell;
             }
-            odd = !odd;
-            x = region.x - if odd { 0.0 } else { tile / 2.0 };
-            y += tile;
+            y += cell;
         }
     }
 

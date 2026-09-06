@@ -166,7 +166,7 @@ pub fn make_checkerboard() -> Texture2D {
     for y in 0..size {
         for x in 0..size {
             let idx = ((y * size + x) * 4) as usize;
-            let gray = if (x / tile + y / tile) % 2 == 0 { 180 } else { 100 };
+            let gray = if (x / tile + y / tile) % 2 == 0 { 42 } else { 28 };
             pixels[idx] = gray;
             pixels[idx + 1] = gray;
             pixels[idx + 2] = gray;
