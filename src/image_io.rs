@@ -1,4 +1,3 @@
----
 use std::fs::File;
 use std::io::{BufReader, Cursor};
 use std::path::Path;
@@ -51,7 +50,6 @@ pub struct LoadedImage {
     inner: DynamicImage,
     rgba: RgbaImage,
     path: String,
-    has_transparency: bool,
     animation: Option<ImageAnimation>,
 }
 
