@@ -4,12 +4,12 @@ use macroquad::prelude::*;
 
 use crate::constants::{
     DOUBLE_CLICK_SECS, DRAG_THRESHOLD_PX, ICON_DATA, TOAST_DURATION, WHEEL_DELTA_UNIT,
-    ZOOM_MAX_NOTCHES_PER_EVENT, ZOOM_PER_NOTCH, TOOLBAR_AUTO_HIDE_DELAY,
+    ZOOM_MAX_NOTCHES_PER_EVENT, ZOOM_PER_NOTCH,
 };
 use crate::gallery::{file_name_of, Gallery};
 use crate::image_io::{make_checkerboard, LoadedImage, Rot};
 use crate::platform;
-use crate::toolbar::{Toolbar, ToolbarAction};
+use crate::toolbar::{Toolbar, ToolbarAction, TOOLBAR_HEIGHT};
 use crate::view::ViewState;
 
 struct Toast {
@@ -382,19 +382,15 @@ impl App {
         let tex_w = self.texture.width();
         let tex_h = self.texture.height();
 
-        // Track mouse movement for toolbar auto-hide
-        let mouse_moved = is_mouse_button_down(MouseButton::Left) || 
-                          (mouse != vec2(mx, my));
-        if mouse_moved {
-            self.last_mouse_move = get_time();
-            self.toolbar.visible = true;
-        }
-
         // Update toolbar hover
         self.toolbar.update_hover(mouse);
 
         // Check toolbar clicks
         if is_mouse_button_pressed(MouseButton::Left) {
+            if self.toolbar.handle_toggle_click(mouse) {
+                return true;
+            }
+
             if let Some(action) = self.toolbar.handle_click(mouse) {
                 match action {
                     ToolbarAction::Prev => self.prev_image(),
@@ -476,16 +472,6 @@ impl App {
             }
         } else {
             self.scroll_acc = 0.0;
-        }
-
-        // Auto-hide toolbar after inactivity
-        if self.toolbar.visible && get_time() - self.last_mouse_move > TOOLBAR_AUTO_HIDE_DELAY {
-            self.toolbar.visible = false;
-        }
-
-        // Show toolbar on any mouse movement
-        if get_time() - self.last_mouse_move < 0.5 {
-            self.toolbar.visible = true;
         }
 
         true
@@ -586,7 +572,13 @@ impl App {
         clear_background(BLACK);
 
         // Draw checkerboard, texture, overlay
-        let rect = self.view.view_rect(tex_w, tex_h, win_w, win_h);
+        let (top_offset, available_h) = if self.toolbar.visible {
+            (TOOLBAR_HEIGHT, (win_h - TOOLBAR_HEIGHT).max(1.0))
+        } else {
+            (0.0, win_h)
+        };
+        let rect = self.view.view_rect(tex_w, tex_h, win_w, available_h, top_offset);
+
         self.draw_checkerboard(rect);
         draw_texture_ex(
             &self.texture,

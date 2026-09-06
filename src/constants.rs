@@ -21,5 +21,3 @@ pub const WINDOW_MIN_PORTRAIT_H: f32 = 800.0;
 pub const WHEEL_DELTA_UNIT: f32 = 120.0;
 /// Cap notches processed from a single wheel burst (trackpad flicks).
 pub const ZOOM_MAX_NOTCHES_PER_EVENT: f32 = 2.0;
-/// Time in seconds to auto-hide toolbar after inactivity
-pub const TOOLBAR_AUTO_HIDE_DELAY: f64 = 2.5;
