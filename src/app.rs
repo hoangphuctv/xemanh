@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use macroquad::prelude::*;
 
 use crate::constants::{
@@ -553,6 +555,14 @@ impl App {
 
         let dt = get_frame_time();
         self.view.tick_zoom(dt);
+
+        // Tick animation if current image is animated
+        if let Some(anim) = self.image.animation_mut() {
+            let d = Duration::from_secs_f32(dt);
+            anim.update(d);
+            let current_tex = anim.current_texture();
+            self.texture = current_tex.clone();
+        }
 
         // Update toolbar button positions
         let win_w = screen_width();

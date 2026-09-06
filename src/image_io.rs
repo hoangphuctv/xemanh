@@ -1,8 +1,42 @@
-use std::io::Cursor;
+use std::fs::File;
+use std::io::{BufReader, Cursor};
 use std::path::Path;
+use std::time::Duration;
 
-use image::{DynamicImage, ImageOutputFormat, RgbaImage};
+use image::codecs::gif::GifDecoder;
+use image::{AnimationDecoder, DynamicImage, ImageOutputFormat, RgbaImage};
 use macroquad::prelude::*;
+
+pub struct ImageAnimation {
+    pub frames: Vec<Texture2D>,
+    pub frame_durations: Vec<Duration>,
+    pub current_frame: usize,
+    pub elapsed_in_frame: Duration,
+}
+
+impl ImageAnimation {
+    pub fn update(&mut self, dt: Duration) {
+        if self.frames.is_empty() {
+            return;
+        }
+        if self.frames.len() > 1 {
+            self.elapsed_in_frame += dt;
+            let mut current_dur = self.frame_durations[self.current_frame];
+            if current_dur.is_zero() {
+                current_dur = Duration::from_millis(100);
+            }
+            while self.elapsed_in_frame >= current_dur {
+                self.elapsed_in_frame -= current_dur;
+                self.current_frame = (self.current_frame + 1) % self.frames.len();
+                current_dur = self.frame_durations[self.current_frame];
+            }
+        }
+    }
+
+    pub fn current_texture(&self) -> &Texture2D {
+        &self.frames[self.current_frame]
+    }
+}
 
 /// Rotate direction.
 #[derive(Clone, Copy, PartialEq)]
@@ -17,6 +51,7 @@ pub struct LoadedImage {
     rgba: RgbaImage,
     path: String,
     has_transparency: bool,
+    animation: Option<ImageAnimation>,
 }
 
 impl LoadedImage {
@@ -29,6 +64,38 @@ impl LoadedImage {
             .unwrap_or("")
             .to_ascii_lowercase();
         let can_have_transparency = !matches!(ext.as_str(), "jpg" | "jpeg" | "jfif" | "jpe" | "bmp");
+        let is_gif = ext == "gif";
+
+        let mut animation = None;
+        if is_gif {
+            if let Ok(file) = File::open(path) {
+                let reader = BufReader::new(file);
+                if let Ok(decoder) = GifDecoder::new(reader) {
+                    if let Ok(raw_frames) = decoder.into_frames().collect_frames() {
+                        if raw_frames.len() > 1 {
+                            let mut textures = Vec::with_capacity(raw_frames.len());
+                            let mut durations = Vec::with_capacity(raw_frames.len());
+                            for frame in &raw_frames {
+                                let buffer = frame.buffer();
+                                let tex = Texture2D::from_rgba8(buffer.width() as u16, buffer.height() as u16, buffer.as_raw());
+                                textures.push(tex);
+                                let (num, denom) = frame.delay().numer_denom_ms();
+                                let ms = if denom == 0 || num == 0 { 100 } else { (num / denom).max(10) };
+                                let dur = Duration::from_millis(ms as u64);
+                                durations.push(dur);
+                            }
+                            animation = Some(ImageAnimation {
+                                frames: textures,
+                                frame_durations: durations,
+                                current_frame: 0,
+                                elapsed_in_frame: Duration::ZERO,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
         let rgba = img.to_rgba8();
         let has_transparency = can_have_transparency && Self::check_transparency(&rgba);
         Ok(Self {
@@ -36,6 +103,7 @@ impl LoadedImage {
             rgba,
             path: path_str,
             has_transparency,
+            animation,
         })
     }
 
@@ -56,6 +124,10 @@ impl LoadedImage {
 
     pub fn rgba(&self) -> &RgbaImage {
         &self.rgba
+    }
+
+    pub fn animation_mut(&mut self) -> Option<&mut ImageAnimation> {
+        self.animation.as_mut()
     }
 
     pub fn has_transparency(&self) -> bool {
