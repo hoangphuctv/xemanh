@@ -5,6 +5,7 @@ mod constants;
 mod gallery;
 mod image_io;
 mod platform;
+mod toolbar;
 mod view;
 
 use std::error::Error;

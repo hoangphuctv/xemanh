@@ -99,7 +99,7 @@ impl ViewState {
     }
 
     /// Displayed rectangle of the texture (after pan-clamping).
-    pub fn view_rect(&self, tex_w: f32, tex_h: f32, win_w: f32, win_h: f32) -> Rect {
+    pub fn view_rect(&self, tex_w: f32, tex_h: f32, win_w: f32, win_h: f32, top_offset: f32) -> Rect {
         let (disp_w, disp_h) = Self::displayed_size(tex_w, tex_h, win_w, win_h, self.zoom);
         let (max_x, max_y) = Self::pan_limits(tex_w, tex_h, win_w, win_h, self.zoom);
         let pan_x = if max_x <= 0.0 {
@@ -115,7 +115,7 @@ impl ViewState {
 
         Rect {
             x: (win_w / 2.0 + pan_x - disp_w / 2.0).round(),
-            y: (win_h / 2.0 + pan_y - disp_h / 2.0).round(),
+            y: (top_offset + win_h / 2.0 + pan_y - disp_h / 2.0).round(),
             w: disp_w.round().max(1.0),
             h: disp_h.round().max(1.0),
         }

@@ -16,6 +16,24 @@ function Get-CargoVersion {
 $oldVer = Get-CargoVersion
 Write-Host "Current version: $oldVer" -ForegroundColor Cyan
 
+# Get commits since previous tag for release notes (oldest to newest)
+$prevTag = (git tag --sort=-creatordate | Select-Object -First 1)
+if ($prevTag) {
+    $commitLines = git log "$prevTag..HEAD" --reverse --pretty=format:"- %s"
+} else {
+    $commitLines = git log --reverse --pretty=format:"- %s"
+}
+
+if ($commitLines) {
+    $releaseNotes = ($commitLines -join "`n")
+} else {
+    $releaseNotes = "- Release v$newVer"
+}
+
+Write-Host "`nRelease notes from $prevTag..HEAD (oldest to newest):" -ForegroundColor Cyan
+Write-Host $releaseNotes -ForegroundColor DarkGray
+Write-Host ""
+
 if ($CustomVersion -ne "") {
     $newVer = $CustomVersion
 } else {
@@ -101,7 +119,7 @@ if ($LASTEXITCODE -eq 0) {
     foreach ($f in $debFiles) { $assets += $f.FullName }
 
     if ($assets.Count -gt 0) {
-        gh release create "v$newVer" $assets --title "v$newVer" --notes "Release v$newVer"
+        gh release create "v$newVer" $assets --title "v$newVer" --notes "$releaseNotes"
     } else {
         Write-Warning "No release artifacts found to upload."
     }
