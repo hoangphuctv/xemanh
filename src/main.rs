@@ -33,7 +33,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // Unicode-safe on Windows (Chinese / CJK paths); args() would be lossy.
     let arg = std::env::args_os().nth(1).map(PathBuf::from);
     let gallery = Gallery::from_startup_arg(arg)?;
-    let mut app = App::new(gallery)?;
+    let mut app = App::new(gallery).await?;
     app.update_title();
 
     let (tw, th) = app.texture_size();

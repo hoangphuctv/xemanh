@@ -57,6 +57,7 @@ pub struct App {
     image: LoadedImage,
     texture: Texture2D,
     checker: Texture2D,
+    font: Font,
     view: ViewState,
     fullscreen: bool,
     toast: Option<Toast>,
@@ -74,15 +75,19 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(gallery: Gallery) -> Result<Self, String> {
+    pub async fn new(gallery: Gallery) -> Result<Self, String> {
         let path = gallery.current().ok_or_else(|| "Gallery is empty".to_string())?;
         let image = LoadedImage::load(path)?;
         let texture = image.upload_texture()?;
+        let font = load_ttf_font("/System/Library/Fonts/Supplemental/Arial Unicode.ttf")
+            .await
+            .map_err(|e| format!("Failed to load Unicode font: {e}"))?;
         Ok(Self {
             gallery,
             image,
             texture,
             checker: make_checkerboard(),
+            font,
             view: ViewState::default(),
             fullscreen: false,
             toast: None,
@@ -693,7 +698,7 @@ impl App {
         if let Some(toast) = &self.toast {
             if get_time() < toast.deadline {
                 let msg = &toast.message;
-                let dims = measure_text(msg, None, 24, 1.0);
+                let dims = measure_text(msg, Some(&self.font), 24, 1.0);
                 let padding = 20.0;
                 let margin = 20.0;
                 let w = dims.width + padding * 2.0;
@@ -701,12 +706,16 @@ impl App {
                 let x = (screen_width() - w) / 2.0;
                 let y = screen_height() - h - margin;
                 draw_rectangle(x, y, w, h, Color::new(0.0, 0.0, 0.0, 0.65));
-                draw_text(
+                draw_text_ex(
                     msg,
                     x + padding,
                     y + padding + dims.height * 0.8,
-                    24.0,
-                    if toast.is_error { RED } else { WHITE },
+                    TextParams {
+                        font: Some(&self.font),
+                        font_size: 24,
+                        color: if toast.is_error { RED } else { WHITE },
+                        ..Default::default()
+                    },
                 );
             }
         }
