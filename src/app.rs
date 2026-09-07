@@ -19,6 +19,8 @@ struct Toast {
     deadline: f64,
 }
 
+const FULLSCREEN_UI_HIDE_SECS: f64 = 2.0;
+
 #[derive(Default)]
 pub struct CropState {
     pub active: bool,
@@ -198,6 +200,7 @@ impl App {
                     self.set_toast(self.gallery.title_label(), false);
                 }
                 self.toolbar.visible = true;
+                self.toolbar.user_hidden = false;
                 self.last_mouse_move = get_time();
             }
             Err(err) => self.set_toast(format!("[{}] {}", index + 1, err), true),
@@ -236,6 +239,7 @@ impl App {
                         let name = file_name_of(&self.gallery.current_path());
                         self.set_toast(format!("Opened {name}"), false);
                         self.toolbar.visible = true;
+                        self.toolbar.user_hidden = false;
                         self.last_mouse_move = get_time();
                     }
                     Err(err) => self.set_toast(err, true),
@@ -260,6 +264,10 @@ impl App {
     fn toggle_fullscreen(&mut self) {
         self.fullscreen = !self.fullscreen;
         platform::set_fullscreen(self.fullscreen);
+        self.toolbar.visible = true;
+        self.toolbar.user_hidden = false;
+        self.last_mouse_move = get_time();
+
         if !self.fullscreen {
             self.request_window_for_texture();
             self.set_toast("Windowed", false);
@@ -366,8 +374,13 @@ impl App {
         let win_h = screen_height();
         let tex_w = self.texture.width();
         let tex_h = self.texture.height();
-        let top_offset = if self.toolbar.visible { TOOLBAR_HEIGHT } else { 0.0 };
-        let available_h = if self.toolbar.visible { (win_h - TOOLBAR_HEIGHT).max(1.0) } else { win_h };
+        let (top_offset, available_h) = if self.fullscreen {
+            (0.0, win_h)
+        } else if self.toolbar.visible {
+            (TOOLBAR_HEIGHT, (win_h - TOOLBAR_HEIGHT).max(1.0))
+        } else {
+            (0.0, win_h)
+        };
         let img_rect = self.view.view_rect(tex_w, tex_h, win_w, available_h, top_offset);
 
         // Convert screen crop rect to texture pixel space
@@ -436,8 +449,31 @@ impl App {
         }
     }
 
+    fn update_fullscreen_ui(&mut self) {
+        if !self.fullscreen {
+            return;
+        }
+
+        // Do not auto-reveal on the same frame as a click. This lets the
+        // persistent show/hide control work normally even while the toolbar
+        // is hidden: clicking it reveals the toolbar instead of immediately
+        // revealing and hiding it again.
+        if mouse_delta_position().length_squared() > 0.0 && !is_mouse_button_down(MouseButton::Left) {
+            if !self.toolbar.user_hidden {
+                self.toolbar.visible = true;
+                self.last_mouse_move = get_time();
+            }
+        } else if self.toolbar.visible
+            && get_time() - self.last_mouse_move >= FULLSCREEN_UI_HIDE_SECS
+        {
+            self.toolbar.visible = false;
+        }
+    }
+
     /// Handles all input. Returns false when the app should quit.
     fn handle_input(&mut self) -> bool {
+        self.update_fullscreen_ui();
+
         // Esc exits Crop mode first, then fullscreen, then quits app.
         if is_key_pressed(KeyCode::Escape) {
             if self.crop_state.active {
@@ -533,6 +569,9 @@ impl App {
         // Check toolbar clicks
         if is_mouse_button_pressed(MouseButton::Left) {
             if self.toolbar.handle_toggle_click(mouse) {
+                if self.fullscreen {
+                    self.last_mouse_move = get_time();
+                }
                 return true;
             }
 
@@ -575,8 +614,13 @@ impl App {
 
         // Handle Mouse Input for Crop Mode vs Pan Mode
         if self.crop_state.active {
-            let top_offset = if self.toolbar.visible { TOOLBAR_HEIGHT } else { 0.0 };
-            let available_h = if self.toolbar.visible { (win_h - TOOLBAR_HEIGHT).max(1.0) } else { win_h };
+            let (top_offset, available_h) = if self.fullscreen {
+                (0.0, win_h)
+            } else if self.toolbar.visible {
+                (TOOLBAR_HEIGHT, (win_h - TOOLBAR_HEIGHT).max(1.0))
+            } else {
+                (0.0, win_h)
+            };
             let img_rect = self.view.view_rect(tex_w, tex_h, win_w, available_h, top_offset);
 
             if is_mouse_button_pressed(MouseButton::Left) {
@@ -791,8 +835,11 @@ impl App {
         // Fullscreen color background
         clear_background(BLACK);
 
-        // Draw checkerboard, texture, overlay
-        let (top_offset, available_h) = if self.toolbar.visible {
+        // In fullscreen the image always owns the entire screen; the toolbar is
+        // drawn on top instead of reducing the image viewport.
+        let (top_offset, available_h) = if self.fullscreen {
+            (0.0, win_h)
+        } else if self.toolbar.visible {
             (TOOLBAR_HEIGHT, (win_h - TOOLBAR_HEIGHT).max(1.0))
         } else {
             (0.0, win_h)

@@ -4,6 +4,7 @@ pub const TOOLBAR_HEIGHT: f32 = 44.0;
 
 pub struct Toolbar {
     pub visible: bool,
+    pub user_hidden: bool,
     pub buttons: Vec<ToolbarButton>,
     pub toggle_rect: Rect,
     pub hovered: Option<usize>,
@@ -31,6 +32,7 @@ impl Toolbar {
     pub fn new() -> Self {
         Self {
             visible: true,
+            user_hidden: false,
             buttons: Vec::new(),
             toggle_rect: Rect::default(),
             hovered: None,
@@ -102,6 +104,7 @@ impl Toolbar {
     pub fn handle_toggle_click(&mut self, mouse_pos: Vec2) -> bool {
         if self.toggle_rect.contains(mouse_pos) {
             self.visible = !self.visible;
+            self.user_hidden = !self.visible;
             true
         } else {
             false

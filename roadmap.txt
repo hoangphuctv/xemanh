@@ -1,0 +1,28 @@
+# XemAnh Roadmap
+
+## Phase 1 — Viewer cực tốt
+- [ ] Filmstrip thumbnail: Hiển thị dải thumbnail của các ảnh trong thư mục để xem nhanh và chuyển trực tiếp đến ảnh mong muốn.
+- [x] Fullscreen UI tự ẩn: Khi fullscreen, tự ẩn toolbar và các thành phần giao diện; di chuyển chuột thì UI xuất hiện lại.
+- [ ] Zoom presets: Thêm các mức zoom cố định như Fit, 100%, 200%, 300% và 400% để chuyển mức phóng đại nhanh bằng phím tắt.
+- [ ] Sort ảnh: Cho phép sắp xếp ảnh theo tên, ngày sửa, ngày chụp hoặc kích thước, với thứ tự tăng hoặc giảm.
+- [ ] Image information: Nhấn phím để xem thông tin ảnh như tên file, kích thước pixel, định dạng, dung lượng và metadata EXIF nếu có.
+
+## Phase 2 — File workflow
+- [ ] Rename: Đổi tên file trực tiếp trong XemAnh bằng phím tắt hoặc thao tác đơn giản, không cần mở trình quản lý file.
+- [ ] Move: Di chuyển ảnh sang thư mục khác ngay trong XemAnh.
+- [ ] Drag & drop: Kéo ảnh từ Explorer/Finder vào XemAnh để mở, và kéo ảnh từ XemAnh ra ngoài để copy.
+- [ ] Open containing folder: Mở Explorer/Finder tại thư mục chứa ảnh hiện tại và chọn đúng file đang xem.
+- [ ] Clipboard paste: Dán ảnh từ clipboard bằng Ctrl+V để XemAnh mở trực tiếp ảnh vừa copy hoặc screenshot.
+
+## Phase 3 — Power user
+- [ ] Image compare: Hiển thị hai ảnh cạnh nhau với zoom và pan đồng bộ để dễ so sánh các phiên bản.
+- [ ] Slideshow: Tự động chuyển qua các ảnh trong thư mục theo khoảng thời gian người dùng chọn.
+- [ ] Keyboard customization: Cho phép thay đổi phím tắt cho các thao tác thường dùng.
+- [ ] Màu sắc / hồ sơ màu: Xử lý màu và hồ sơ màu của ảnh chính xác hơn, đặc biệt với ảnh có ICC profile.
+- [ ] RAW/HEIC nếu muốn mở rộng: Hỗ trợ thêm các định dạng ảnh phổ biến nhưng chưa được hỗ trợ mặc định như RAW và HEIC.
+
+## Không ưu tiên
+- [ ] Tài khoản / cloud / đồng bộ: Không xây dựng hệ thống tài khoản hoặc đồng bộ ảnh lên dịch vụ cloud.
+- [ ] AI chỉnh ảnh: Không biến XemAnh thành công cụ chỉnh sửa ảnh bằng AI.
+- [ ] Thư viện ảnh / database phức tạp: Không xây dựng hệ thống quản lý thư viện ảnh cần database hoặc indexing lớn.
+- [ ] Feed / quảng cáo: Không thêm feed nội dung, quảng cáo hoặc các thành phần gây phân tâm khi xem ảnh.
