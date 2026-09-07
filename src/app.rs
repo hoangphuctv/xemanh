@@ -324,6 +324,17 @@ impl App {
             .file_stem()
             .and_then(|s| s.to_str())
             .unwrap_or("image");
+
+        // Strip existing _cropN suffix if present to prevent file_crop1_crop2.jpg
+        let base_stem = if let Some(idx) = stem.rfind("_crop") {
+            if stem[idx + 5..].chars().all(|c| c.is_ascii_digit()) && !stem[idx + 5..].is_empty() {
+                &stem[..idx]
+            } else {
+                stem
+            }
+        } else {
+            stem
+        };
         let ext = original_path
             .extension()
             .and_then(|e| e.to_str())
@@ -331,7 +342,7 @@ impl App {
 
         let mut count = 1;
         loop {
-            let candidate_name = format!("{}_crop{}.{}", stem, count, ext);
+            let candidate_name = format!("{}_crop{}.{}", base_stem, count, ext);
             let candidate_path = parent.join(candidate_name);
             if !candidate_path.exists() {
                 return candidate_path;

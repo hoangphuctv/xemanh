@@ -62,7 +62,6 @@ impl LoadedImage {
             .and_then(|e| e.to_str())
             .unwrap_or("")
             .to_ascii_lowercase();
-        let can_have_transparency = !matches!(ext.as_str(), "jpg" | "jpeg" | "jfif" | "jpe" | "bmp");
         let is_gif = ext == "gif";
 
         let mut animation = None;
@@ -96,19 +95,12 @@ impl LoadedImage {
         }
 
         let rgba = img.to_rgba8();
-        let has_transparency = can_have_transparency && Self::check_transparency(&rgba);
         Ok(Self {
             inner: img,
             rgba,
             path: path_str,
-            has_transparency,
             animation,
         })
-    }
-
-    fn check_transparency(rgba: &RgbaImage) -> bool {
-        // Check if any pixel has alpha < 255
-        rgba.pixels().any(|p| p.0[3] != 255)
     }
 
     pub fn upload_texture(&self) -> Result<Texture2D, String> {
