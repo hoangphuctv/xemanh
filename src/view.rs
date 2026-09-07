@@ -49,8 +49,7 @@ impl ViewState {
     /// Scale at zoom = 1.0: one image pixel maps to one physical screen pixel
     /// when the image fits; only shrinks when the image is larger than the window.
     pub fn base_scale(tex_w: f32, tex_h: f32, win_w: f32, win_h: f32) -> f32 {
-        let native = 1.0 / screen_dpi_scale().max(1.0);
-        Self::fit_scale(tex_w, tex_h, win_w, win_h).min(native)
+        Self::fit_scale(tex_w, tex_h, win_w, win_h).min(1.0)
     }
 
     fn displayed_size(tex_w: f32, tex_h: f32, win_w: f32, win_h: f32, zoom: f32) -> (f32, f32) {
