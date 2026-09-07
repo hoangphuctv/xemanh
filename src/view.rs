@@ -46,7 +46,7 @@ impl ViewState {
         (win_w / tex_w).min(win_h / tex_h)
     }
 
-    /// Scale at zoom = 1.0: one image pixel maps to one physical screen pixel
+    /// Scale at zoom = 1.0: one image pixel maps to one logical screen pixel
     /// when the image fits; only shrinks when the image is larger than the window.
     pub fn base_scale(tex_w: f32, tex_h: f32, win_w: f32, win_h: f32) -> f32 {
         Self::fit_scale(tex_w, tex_h, win_w, win_h).min(1.0)
