@@ -485,6 +485,165 @@ unsafe fn global_free(mem: *mut std::ffi::c_void) {
     }
 }
 
+pub fn read_image_from_clipboard(hwnd: usize) -> Result<image::DynamicImage, String> {
+    #[cfg(target_os = "windows")]
+    {
+        use std::ffi::c_void;
+        use std::io::Cursor;
+
+        unsafe extern "system" {
+            fn OpenClipboard(hwnd: *mut c_void) -> i32;
+            fn CloseClipboard() -> i32;
+            fn GetClipboardData(format: u32) -> *mut c_void;
+            fn IsClipboardFormatAvailable(format: u32) -> i32;
+            fn GlobalLock(mem: *mut c_void) -> *mut c_void;
+            fn GlobalUnlock(mem: *mut c_void) -> i32;
+            fn GlobalSize(mem: *mut c_void) -> usize;
+            fn RegisterClipboardFormatW(name: *const u16) -> u32;
+            fn DragQueryFileW(hdrop: *mut c_void, i_file: u32, lpsz_file: *mut u16, cch: u32) -> u32;
+        }
+
+        const CF_DIB: u32 = 8;
+        const CF_HDROP: u32 = 15;
+
+        let png_wide: Vec<u16> = "PNG\0".encode_utf16().collect();
+        let cf_png = unsafe { RegisterClipboardFormatW(png_wide.as_ptr()) };
+
+        if unsafe { OpenClipboard(hwnd as *mut c_void) } == 0 {
+            return Err("Cannot open clipboard".into());
+        }
+
+        let mut result_img: Option<Result<image::DynamicImage, String>> = None;
+
+        // 1. Check PNG format on clipboard
+        if cf_png != 0 && unsafe { IsClipboardFormatAvailable(cf_png) } != 0 {
+            let h_data = unsafe { GetClipboardData(cf_png) };
+            if !h_data.is_null() {
+                let ptr = unsafe { GlobalLock(h_data) };
+                if !ptr.is_null() {
+                    let size = unsafe { GlobalSize(h_data) };
+                    let slice = unsafe { std::slice::from_raw_parts(ptr as *const u8, size) };
+                    match image::load_from_memory(slice) {
+                        Ok(img) => result_img = Some(Ok(img)),
+                        Err(e) => result_img = Some(Err(format!("Failed to parse PNG from clipboard: {}", e))),
+                    }
+                    unsafe { GlobalUnlock(h_data) };
+                }
+            }
+        }
+
+        // 2. Check CF_DIB format
+        if result_img.is_none() && unsafe { IsClipboardFormatAvailable(CF_DIB) } != 0 {
+            let h_data = unsafe { GetClipboardData(CF_DIB) };
+            if !h_data.is_null() {
+                let ptr = unsafe { GlobalLock(h_data) };
+                if !ptr.is_null() {
+                    let size = unsafe { GlobalSize(h_data) };
+                    let dib_bytes = unsafe { std::slice::from_raw_parts(ptr as *const u8, size) };
+                    
+                    if dib_bytes.len() >= 40 {
+                        let header_size = u32::from_le_bytes(dib_bytes[0..4].try_into().unwrap()) as usize;
+                        let width = i32::from_le_bytes(dib_bytes[4..8].try_into().unwrap());
+                        let height = i32::from_le_bytes(dib_bytes[8..12].try_into().unwrap());
+                        let planes = u16::from_le_bytes(dib_bytes[12..14].try_into().unwrap());
+                        let bit_count = u16::from_le_bytes(dib_bytes[14..16].try_into().unwrap());
+                        let compression = u32::from_le_bytes(dib_bytes[16..20].try_into().unwrap());
+
+                        let is_top_down = height < 0;
+                        let abs_w = width.abs() as usize;
+                        let abs_h = height.abs() as usize;
+
+                        // BI_RGB = 0, BI_BITFIELDS = 3
+                        if (compression == 0 || compression == 3) && planes == 1 && (bit_count == 24 || bit_count == 32) {
+                            let mut offset = header_size;
+                            if compression == 3 && header_size == 40 {
+                                offset += 12; // 3 DWORD bitmasks
+                            }
+
+                            let row_bytes = (abs_w * (bit_count as usize) / 8 + 3) & !3;
+                            if dib_bytes.len() >= offset + row_bytes * abs_h {
+                                let mut rgba_buf = vec![0u8; abs_w * abs_h * 4];
+                                for y in 0..abs_h {
+                                    let src_y = if is_top_down { y } else { abs_h - 1 - y };
+                                    let src_row = &dib_bytes[offset + src_y * row_bytes .. offset + (src_y + 1) * row_bytes];
+                                    let dst_row_start = y * abs_w * 4;
+
+                                    if bit_count == 32 {
+                                        for x in 0..abs_w {
+                                            let b = src_row[x * 4];
+                                            let g = src_row[x * 4 + 1];
+                                            let r = src_row[x * 4 + 2];
+                                            let a = src_row[x * 4 + 3];
+                                            let idx = dst_row_start + x * 4;
+                                            rgba_buf[idx] = r;
+                                            rgba_buf[idx + 1] = g;
+                                            rgba_buf[idx + 2] = b;
+                                            // Handle alpha if present or zero
+                                            rgba_buf[idx + 3] = if a == 0 && (r != 0 || g != 0 || b != 0) { 255 } else { a };
+                                        }
+                                    } else { // 24 bit
+                                        for x in 0..abs_w {
+                                            let b = src_row[x * 3];
+                                            let g = src_row[x * 3 + 1];
+                                            let r = src_row[x * 3 + 2];
+                                            let idx = dst_row_start + x * 4;
+                                            rgba_buf[idx] = r;
+                                            rgba_buf[idx + 1] = g;
+                                            rgba_buf[idx + 2] = b;
+                                            rgba_buf[idx + 3] = 255;
+                                        }
+                                    }
+                                }
+                                if let Some(img_buf) = image::RgbaImage::from_raw(abs_w as u32, abs_h as u32, rgba_buf) {
+                                    result_img = Some(Ok(image::DynamicImage::ImageRgba8(img_buf)));
+                                }
+                            }
+                        }
+                    }
+                    if result_img.is_none() {
+                        result_img = Some(Err("Unsupported DIB format on clipboard".into()));
+                    }
+                    unsafe { GlobalUnlock(h_data) };
+                }
+            }
+        }
+
+        // 3. Check CF_HDROP format (copied file)
+        if result_img.is_none() && unsafe { IsClipboardFormatAvailable(CF_HDROP) } != 0 {
+            let h_data = unsafe { GetClipboardData(CF_HDROP) };
+            if !h_data.is_null() {
+                let ptr = unsafe { GlobalLock(h_data) };
+                if !ptr.is_null() {
+                    let file_count = unsafe { DragQueryFileW(ptr, 0xFFFFFFFF, std::ptr::null_mut(), 0) };
+                    if file_count > 0 {
+                        let mut buf = vec![0u16; 512];
+                        let len = unsafe { DragQueryFileW(ptr, 0, buf.as_mut_ptr(), buf.len() as u32) };
+                        if len > 0 {
+                            let path_str = String::from_utf16_lossy(&buf[..len as usize]);
+                            let path = std::path::Path::new(&path_str);
+                            match image::open(path) {
+                                Ok(img) => result_img = Some(Ok(img)),
+                                Err(e) => result_img = Some(Err(format!("Cannot open image file from clipboard: {}", e))),
+                            }
+                        }
+                    }
+                    unsafe { GlobalUnlock(h_data) };
+                }
+            }
+        }
+
+        unsafe { CloseClipboard() };
+
+        result_img.unwrap_or_else(|| Err("No image or copied image file found on clipboard".into()))
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = hwnd;
+        Err("Clipboard paste is only supported on Windows".into())
+    }
+}
+
 #[cfg(not(target_os = "windows"))]
 pub fn copy_image_to_clipboard(
     _hwnd: usize,
