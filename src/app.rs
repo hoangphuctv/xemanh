@@ -81,9 +81,16 @@ impl App {
         let path = gallery.current().ok_or_else(|| "Gallery is empty".to_string())?;
         let image = LoadedImage::load(path)?;
         let texture = image.upload_texture()?;
-        let font = load_ttf_font("/System/Library/Fonts/Supplemental/Arial Unicode.ttf")
+        #[cfg(target_os = "windows")]
+        let font_path = "C:\\Windows\\Fonts\\arial.ttf";
+        #[cfg(target_os = "macos")]
+        let font_path = "/System/Library/Fonts/Supplemental/Arial Unicode.ttf";
+        #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+        let font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
+
+        let font = load_ttf_font(font_path)
             .await
-            .map_err(|e| format!("Failed to load Unicode font: {e}"))?;
+            .map_err(|e| format!("Failed to load Unicode font '{font_path}': {e}"))?;
         Ok(Self {
             gallery,
             image,
