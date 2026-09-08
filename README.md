@@ -32,6 +32,7 @@ Double-click file ảnh → cửa sổ vừa khít tấm hình → lướt sang 
 - **Xóa nhầm vẫn cứu được** — Delete đưa vào Thùng rác Windows, không mất vĩnh viễn.
 - **PNG trong suốt hiện rõ** — nền caro, thấy đúng chỗ trong suốt.
 - **Tên file tiếng Việt, Trung, Nhật… hiện đúng** — không bị lỗi font trên thanh tiêu đề.
+- **Dán ảnh từ clipboard** — bấm `Ctrl` + `V` để xem ngay ảnh vừa copy hoặc chụp màn hình (tự động lưu vào thư mục `~/Pictures/XemAnh/`).
 - **Gọn** — một phần mềm nhỏ, cài xong dùng ngay, không chạy ngầm.
 
 ## Cài đặt
@@ -72,6 +73,7 @@ Mở một ảnh (double-click, hoặc kéo thả vào XemAnh). Các ảnh khác
 | Về vừa khít cửa sổ | Double-click, hoặc bấm `0` |
 | Toàn màn hình | `Space` |
 | Copy ảnh vào clipboard | `Ctrl` + `C` |
+| Dán ảnh từ clipboard | `Ctrl` + `V` (tự lưu vào `~/Pictures/XemAnh/` và mở ngay) |
 | Thoát toàn màn hình / thoát app | `Esc` (bấm lần nữa để thoát) |
 | Xoay phải và lưu | `R` |
 | Xoay trái và lưu | `Shift` + `R` |
