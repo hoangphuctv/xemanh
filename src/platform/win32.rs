@@ -489,7 +489,6 @@ pub fn read_image_from_clipboard(hwnd: usize) -> Result<image::DynamicImage, Str
     #[cfg(target_os = "windows")]
     {
         use std::ffi::c_void;
-        use std::io::Cursor;
 
         unsafe extern "system" {
             fn OpenClipboard(hwnd: *mut c_void) -> i32;
