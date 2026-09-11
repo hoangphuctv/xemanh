@@ -63,6 +63,7 @@ pub struct App {
     view: ViewState,
     fullscreen: bool,
     toast: Option<Toast>,
+    show_image_info: bool,
     last_click_time: f64,
     hwnd: usize,
     was_maximized: bool,
@@ -100,6 +101,7 @@ impl App {
             view: ViewState::default(),
             fullscreen: false,
             toast: None,
+            show_image_info: false,
             last_click_time: 0.0,
             hwnd: 0,
             was_maximized: false,
@@ -601,6 +603,10 @@ impl App {
         }
 
         // Rotate & save
+        if is_key_pressed(KeyCode::I) {
+            self.show_image_info = !self.show_image_info;
+        }
+
         if is_key_pressed(KeyCode::R) {
             let shift = is_key_down(KeyCode::LeftShift) || is_key_down(KeyCode::RightShift);
             self.rotate_and_save(if shift { Rot::Ccw } else { Rot::Cw });
@@ -839,6 +845,53 @@ impl App {
                         font: Some(&self.font),
                         font_size: 24,
                         color: if toast.is_error { RED } else { WHITE },
+                        ..Default::default()
+                    },
+                );
+            }
+        }
+
+        if self.show_image_info {
+            let path = self.gallery.current_path();
+            let name = file_name_of(&path);
+            let width = self.texture.width();
+            let height = self.texture.height();
+
+            let lines = [
+                name,
+                format!("Kích thước: {:.0} × {:.0} px", width, height),
+            ];
+            let font_size = 24u16;
+            let line_height = 36.0;
+            let padding = 24.0;
+
+            let max_width = lines
+                .iter()
+                .map(|line| measure_text(line, Some(&self.font), font_size, 1.0).width)
+                .fold(0.0, f32::max);
+
+            let panel_w = max_width + padding * 2.0;
+            let panel_h = line_height * lines.len() as f32 + padding * 2.0;
+            let panel_x = (screen_width() - panel_w) / 2.0;
+            let panel_y = (screen_height() - panel_h) / 2.0;
+
+            draw_rectangle(
+                panel_x,
+                panel_y,
+                panel_w,
+                panel_h,
+                Color::new(0.0, 0.0, 0.0, 0.78),
+            );
+
+            for (index, line) in lines.iter().enumerate() {
+                draw_text_ex(
+                    line,
+                    panel_x + padding,
+                    panel_y + padding + line_height * (index as f32 + 0.78),
+                    TextParams {
+                        font: Some(&self.font),
+                        font_size,
+                        color: WHITE,
                         ..Default::default()
                     },
                 );
