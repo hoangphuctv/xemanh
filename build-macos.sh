@@ -19,6 +19,30 @@ if ! command -v cargo >/dev/null 2>&1; then
   exit 1
 fi
 
+IS_RELEASE=false
+if [[ "${1:-}" == "release" ]]; then
+  IS_RELEASE=true
+fi
+
+if [[ "$IS_RELEASE" == "true" ]]; then
+  if ! command -v gh >/dev/null 2>&1; then
+    echo "[ERROR] Missing tool: gh (GitHub CLI)"
+    exit 1
+  fi
+
+  echo "[INFO] Release mode enabled. Fetching latest tags..."
+  git fetch --tags
+
+  LATEST_TAG="$(git tag --sort=-v:refname | head -n 1)"
+  if [[ -z "$LATEST_TAG" ]]; then
+    echo "[ERROR] No git tags found in repository."
+    exit 1
+  fi
+
+  echo "[INFO] Latest tag found: $LATEST_TAG. Checking out..."
+  git checkout "$LATEST_TAG"
+fi
+
 echo "[INFO] Building XemAnh for macOS..."
 echo "[INFO] Architecture: $(uname -m)"
 
@@ -171,3 +195,22 @@ echo "[SUCCESS] macOS release build completed."
 echo "[INFO] Binary: $BINARY"
 echo "[INFO] App: $APP_DIR"
 echo "[INFO] DMG: $DMG_PATH"
+
+if [[ "$IS_RELEASE" == "true" ]]; then
+  echo "[INFO] Checking latest GitHub release tag..."
+  GH_RELEASE_TAG="$(gh release list --limit 1 | awk '{print $1}')"
+
+  if [[ -z "$GH_RELEASE_TAG" ]]; then
+    echo "[ERROR] Could not find any release on GitHub via 'gh release list'."
+    exit 1
+  fi
+
+  if [[ "$GH_RELEASE_TAG" != "$LATEST_TAG" ]]; then
+    echo "[ERROR] Tag mismatch! Checked out git tag '$LATEST_TAG', but latest GitHub release is '$GH_RELEASE_TAG'."
+    exit 1
+  fi
+
+  echo "[INFO] Tag matches ($LATEST_TAG). Uploading $DMG_NAME to GitHub release..."
+  gh release upload "$LATEST_TAG" "$DMG_PATH" --clobber
+  echo "[SUCCESS] DMG uploaded successfully to release $LATEST_TAG."
+fi
