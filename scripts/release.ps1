@@ -264,8 +264,10 @@ $diffStat
 $diffPatch
 
 Write release notes in Vietnamese, clear and friendly:
-- Focus on what users gain: new features, improvements, bug fixes.
-- Skip internal chores (release bumps, lockfile-only, build plumbing) unless they change user experience.
+- ONLY cover end-user facing changes in the XemAnh app itself: viewing images, UI, shortcuts, performance, bug fixes users can notice.
+- IGNORE everything that only helps developers or packaging/setup, even if it appears in the diff. Skip: release/build scripts, packaging (.bat/.sh/Inno/deb/dmg), CI, tooling, utils for development, Cargo/deps/lockfile-only changes, README/docs for maintainers, installer plumbing, agent/release-note automation.
+- If a commit mixes app behavior and tooling, mention only the app behavior.
+- If there are no user-facing app changes, output a single short line: "- Bản cập nhật kỹ thuật (không thay đổi trải nghiệm người dùng)."
 - Do NOT invent changes that are not supported by the commits/diff.
 - Use GitHub markdown. Prefer sections only when they have items:
   ## Tính năng mới
