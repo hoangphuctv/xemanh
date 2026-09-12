@@ -177,11 +177,12 @@ unsafe fn app_window() -> ObjcId {
     msg_send![windows, objectAtIndex: 0usize]
 }
 
-/// Sets window size in logical points and centers it within the visible screen area.
+/// Resizes the window in logical points, keeping its current top-left position.
 ///
 /// miniquad's `set_window_size` and macroquad's `request_new_screen_size` both pass
 /// backing-store pixels on macOS, but `NSWindow` expects points — so we set the frame
-/// directly and center it.
+/// directly. The origin is preserved (no re-centering) so the window never jumps
+/// during auto-fit.
 pub fn set_window_frame(logical_w: f32, logical_h: f32) {
     let w = logical_w.round().max(1.0) as f64;
     let h = logical_h.round().max(1.0) as f64;
@@ -194,26 +195,13 @@ pub fn set_window_frame(logical_w: f32, logical_h: f32) {
             return;
         }
 
-        let screen: ObjcId = msg_send![class!(NSScreen), mainScreen];
-        let visible: NSRect = if screen.is_null() {
-            NSRect {
-                origin: NSPoint { x: 0.0, y: 0.0 },
-                size: NSSize {
-                    width: w,
-                    height: h,
-                },
-            }
-        } else {
-            msg_send![screen, visibleFrame]
-        };
-
-        let origin_x = visible.origin.x + (visible.size.width - w).max(0.0) / 2.0;
-        let origin_y = visible.origin.y + (visible.size.height - h).max(0.0) / 2.0;
-
+        // NSWindow's frame origin is the bottom-left corner. Adjust y so the top
+        // edge stays where it is while resizing; keep x unchanged.
+        let current: NSRect = msg_send![window, frame];
         let frame = NSRect {
             origin: NSPoint {
-                x: origin_x,
-                y: origin_y,
+                x: current.origin.x,
+                y: current.origin.y + current.size.height - h,
             },
             size: NSSize { width: w, height: h },
         };

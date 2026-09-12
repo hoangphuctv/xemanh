@@ -82,6 +82,57 @@ impl App {
         let path = gallery.current().ok_or_else(|| "Gallery is empty".to_string())?;
         let image = LoadedImage::load(path)?;
         let texture = image.upload_texture()?;
+
+        // Request the final window size (image + toolbar strip) immediately, then
+        // paint one frame with the image before loading the (large) Unicode font.
+        // This removes the black-window flash on startup and the wrong-sized
+        // first frame that would otherwise precede the window resize.
+        let dpi = screen_dpi_scale().max(1.0);
+        // Window = image + reserved toolbar strip at the top.
+        let (target_w, target_h) = platform::clamp_window_target(
+            texture.width() / dpi,
+            texture.height() / dpi + TOOLBAR_HEIGHT,
+            dpi,
+        );
+        platform::request_window_size(target_w, target_h);
+
+        // Wait (short timeout) until the framebuffer matches the requested size.
+        // Painting into a stale framebuffer before the OS applies the resize makes
+        // the OS stretch that frame to fill the new window — a visible vertical
+        // squash on the first frame.
+        let wait_deadline = get_time() + 0.5;
+        while (screen_width() - target_w).abs() > 1.0
+            || (screen_height() - target_h).abs() > 1.0
+        {
+            if get_time() > wait_deadline {
+                break;
+            }
+            next_frame().await;
+        }
+
+        {
+            // Paint one frame with the image before loading the (large) Unicode
+            // font. Reserve the same top strip the steady-state viewport uses.
+            let view = ViewState::default();
+            let (win_w, win_h) = (screen_width(), screen_height());
+            let top_offset = TOOLBAR_HEIGHT;
+            let available_h = (win_h - TOOLBAR_HEIGHT).max(1.0);
+            let rect =
+                view.view_rect(texture.width(), texture.height(), win_w, available_h, top_offset);
+            clear_background(BLACK);
+            draw_texture_ex(
+                &texture,
+                rect.x,
+                rect.y,
+                WHITE,
+                DrawTextureParams {
+                    dest_size: Some(vec2(rect.w, rect.h)),
+                    ..Default::default()
+                },
+            );
+            next_frame().await;
+        }
+
         #[cfg(target_os = "windows")]
         let font_path = "C:\\Windows\\Fonts\\arial.ttf";
         #[cfg(target_os = "macos")]
@@ -144,9 +195,10 @@ impl App {
 
     fn request_window_for_texture(&self) {
         let dpi = screen_dpi_scale().max(1.0);
+        // Window = image + reserved toolbar strip at the top.
         let (w, h) = platform::clamp_window_target(
             self.texture.width() / dpi,
-            self.texture.height() / dpi,
+            self.texture.height() / dpi + TOOLBAR_HEIGHT,
             dpi,
         );
         platform::request_window_size(w, h);
@@ -187,7 +239,7 @@ impl App {
                     let dpi = screen_dpi_scale().max(1.0);
                     let (w_img, h_img) = platform::clamp_window_target(
                         self.texture.width() / dpi,
-                        self.texture.height() / dpi,
+                        self.texture.height() / dpi + TOOLBAR_HEIGHT,
                         dpi,
                     );
 
@@ -450,12 +502,12 @@ impl App {
         let win_h = screen_height();
         let tex_w = self.texture.width();
         let tex_h = self.texture.height();
+        // Reserve the toolbar strip at the top whenever windowed; the toolbar
+        // never overlaps the image, and toggling it does not move the image.
         let (top_offset, available_h) = if self.fullscreen {
             (0.0, win_h)
-        } else if self.toolbar.visible {
-            (TOOLBAR_HEIGHT, (win_h - TOOLBAR_HEIGHT).max(1.0))
         } else {
-            (0.0, win_h)
+            (TOOLBAR_HEIGHT, (win_h - TOOLBAR_HEIGHT).max(1.0))
         };
         let img_rect = self.view.view_rect(tex_w, tex_h, win_w, available_h, top_offset);
 
@@ -649,6 +701,13 @@ impl App {
         let win_h = screen_height();
         let tex_w = self.texture.width();
         let tex_h = self.texture.height();
+        // Image viewport: reserve the toolbar strip when windowed. Used for
+        // zoom/pan math so it matches what `update()` actually draws.
+        let (top_offset, available_h) = if self.fullscreen {
+            (0.0, win_h)
+        } else {
+            (TOOLBAR_HEIGHT, (win_h - TOOLBAR_HEIGHT).max(1.0))
+        };
 
         // Update toolbar hover
         self.toolbar.update_hover(mouse);
@@ -668,13 +727,29 @@ impl App {
                     ToolbarAction::Next => self.next_image(),
                     ToolbarAction::ZoomIn => {
                         let factor = ZOOM_PER_NOTCH;
-                        self.view.zoom_at_mouse(factor, mouse, tex_w, tex_h, win_w, win_h);
+                        self.view.zoom_at_mouse(
+                            factor,
+                            mouse,
+                            tex_w,
+                            tex_h,
+                            win_w,
+                            available_h,
+                            top_offset,
+                        );
                         let percent = (self.view.zoom_target * 100.0).round() as i32;
                         self.set_toast(format!("{percent}%"), false);
                     }
                     ToolbarAction::ZoomOut => {
                         let factor = 1.0 / ZOOM_PER_NOTCH;
-                        self.view.zoom_at_mouse(factor, mouse, tex_w, tex_h, win_w, win_h);
+                        self.view.zoom_at_mouse(
+                            factor,
+                            mouse,
+                            tex_w,
+                            tex_h,
+                            win_w,
+                            available_h,
+                            top_offset,
+                        );
                         let percent = (self.view.zoom_target * 100.0).round() as i32;
                         self.set_toast(format!("{percent}%"), false);
                     }
@@ -701,13 +776,7 @@ impl App {
 
         // Handle Mouse Input for Crop Mode vs Pan Mode
         if self.crop_state.active {
-            let (top_offset, available_h) = if self.fullscreen {
-                (0.0, win_h)
-            } else if self.toolbar.visible {
-                (TOOLBAR_HEIGHT, (win_h - TOOLBAR_HEIGHT).max(1.0))
-            } else {
-                (0.0, win_h)
-            };
+            // Match the `update()` viewport so crop coordinates line up.
             let img_rect = self.view.view_rect(tex_w, tex_h, win_w, available_h, top_offset);
 
             if is_mouse_button_pressed(MouseButton::Left) {
@@ -741,10 +810,10 @@ impl App {
                         if delta.length() >= DRAG_THRESHOLD_PX {
                             self.dragging = true;
                         }
-                        if self.view.can_pan(tex_w, tex_h, win_w, win_h) {
+                        if self.view.can_pan(tex_w, tex_h, win_w, available_h) {
                             self.view.pan += delta;
                             self.view.pan_target += delta;
-                            self.view.clamp_pan(tex_w, tex_h, win_w, win_h);
+                            self.view.clamp_pan(tex_w, tex_h, win_w, available_h);
                         }
                         self.drag_last = Some(mouse);
                     }
@@ -774,8 +843,15 @@ impl App {
             if notches != 0.0 {
                 let clamped = notches.clamp(-ZOOM_MAX_NOTCHES_PER_EVENT, ZOOM_MAX_NOTCHES_PER_EVENT);
                 let factor = ZOOM_PER_NOTCH.powf(clamped);
-                self.view
-                    .zoom_at_mouse(factor, mouse, tex_w, tex_h, win_w, win_h);
+                self.view.zoom_at_mouse(
+                    factor,
+                    mouse,
+                    tex_w,
+                    tex_h,
+                    win_w,
+                    available_h,
+                    top_offset,
+                );
                 self.scroll_acc -= clamped * WHEEL_DELTA_UNIT;
             }
         } else {
@@ -969,14 +1045,12 @@ impl App {
         // Fullscreen color background
         clear_background(BLACK);
 
-        // In fullscreen the image always owns the entire screen; the toolbar is
-        // drawn on top instead of reducing the image viewport.
+        // Reserve the toolbar strip whenever windowed; toggling the toolbar
+        // never moves the image. In fullscreen the toolbar overlays the image.
         let (top_offset, available_h) = if self.fullscreen {
             (0.0, win_h)
-        } else if self.toolbar.visible {
-            (TOOLBAR_HEIGHT, (win_h - TOOLBAR_HEIGHT).max(1.0))
         } else {
-            (0.0, win_h)
+            (TOOLBAR_HEIGHT, (win_h - TOOLBAR_HEIGHT).max(1.0))
         };
         let rect = self.view.view_rect(tex_w, tex_h, win_w, available_h, top_offset);
 

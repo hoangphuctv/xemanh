@@ -16,6 +16,7 @@ use macroquad::prelude::*;
 use app::App;
 use gallery::Gallery;
 use platform::{clamp_window_target, request_window_size};
+use toolbar::TOOLBAR_HEIGHT;
 
 fn window_conf() -> Conf {
     Conf {
@@ -48,7 +49,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let (tw, th) = app.texture_size();
     let dpi = screen_dpi_scale().max(1.0);
-    let (w, h) = clamp_window_target(tw / dpi, th / dpi, dpi);
+    // Window = image + reserved toolbar strip at the top.
+    let (w, h) = clamp_window_target(tw / dpi, th / dpi + TOOLBAR_HEIGHT, dpi);
     #[cfg(not(target_os = "macos"))]
     request_window_size(w, h);
 

@@ -127,17 +127,20 @@ impl ViewState {
         tex_h: f32,
         win_w: f32,
         win_h: f32,
+        top_offset: f32,
     ) -> Rect {
         let (disp_w, disp_h) = Self::displayed_size(tex_w, tex_h, win_w, win_h, zoom);
         Rect {
             x: win_w / 2.0 + self.pan_target.x - disp_w / 2.0,
-            y: win_h / 2.0 + self.pan_target.y - disp_h / 2.0,
+            y: top_offset + win_h / 2.0 + self.pan_target.y - disp_h / 2.0,
             w: disp_w,
             h: disp_h,
         }
     }
 
     /// Zooms by `factor`, keeping the point under the mouse cursor fixed.
+    /// `top_offset` is the y of the image viewport (e.g. toolbar height when
+    /// windowed); `win_h` is the image viewport height, not the full window.
     pub fn zoom_at_mouse(
         &mut self,
         factor: f32,
@@ -146,17 +149,20 @@ impl ViewState {
         tex_h: f32,
         win_w: f32,
         win_h: f32,
+        top_offset: f32,
     ) {
-        let before = self.view_rect_at_zoom(self.zoom_target, tex_w, tex_h, win_w, win_h);
+        let before =
+            self.view_rect_at_zoom(self.zoom_target, tex_w, tex_h, win_w, win_h, top_offset);
         let base = Self::base_scale(tex_w, tex_h, win_w, win_h);
 
         let min_zoom = 0.25;
         let max_zoom = (8.0 / base).max(1.0);
         self.zoom_target = (self.zoom_target * factor).clamp(min_zoom, max_zoom);
 
-        let after = self.view_rect_at_zoom(self.zoom_target, tex_w, tex_h, win_w, win_h);
+        let after =
+            self.view_rect_at_zoom(self.zoom_target, tex_w, tex_h, win_w, win_h, top_offset);
         // pan' = m - center - (m - center - pan_before) * (size_after / size_before)
-        let center = vec2(win_w / 2.0, win_h / 2.0);
+        let center = vec2(win_w / 2.0, top_offset + win_h / 2.0);
         let pan_before = self.pan_target;
         let ratio = if before.w > 0.0 {
             after.w / before.w
