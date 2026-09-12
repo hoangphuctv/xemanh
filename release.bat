@@ -1,5 +1,5 @@
 @echo off
-setlocal
+setlocal EnableDelayedExpansion
 cd /d "%~dp0"
 
 REM UTF-8 so Vietnamese release notes survive agent stdout / console I/O
@@ -26,9 +26,9 @@ if /i "%~1"=="rebuild" (
         powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\release.ps1" -RebuildVersion "%~2"
     )
 ) else (
-    set BUMP_TYPE=%~1
-    if "%BUMP_TYPE%"=="" set BUMP_TYPE=patch
-    powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\release.ps1" -BumpType %BUMP_TYPE% %2 %3 %4 %5
+    set "BUMP_TYPE=%~1"
+    if "!BUMP_TYPE!"=="" set "BUMP_TYPE=patch"
+    powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\release.ps1" -BumpType !BUMP_TYPE! %2 %3 %4 %5
 )
 
 if %errorlevel% neq 0 (
