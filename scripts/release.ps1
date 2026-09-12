@@ -5,6 +5,16 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+function Write-Utf8File {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Content,
+        [switch]$NoBom
+    )
+    $encoding = New-Object System.Text.UTF8Encoding (-not $NoBom.IsPresent)
+    [System.IO.File]::WriteAllText($Path, $Content, $encoding)
+}
+
 function Get-CargoVersion {
     $content = Get-Content "Cargo.toml" -Raw
     if ($content -match 'version\s*=\s*"([^"]+)"') {
@@ -41,6 +51,164 @@ function Find-CursorAgent {
     return $null
 }
 
+function Quote-ProcessArg {
+    param([string]$Value)
+    if ($null -eq $Value) { return '""' }
+    if ($Value -notmatch '[\s"]') { return $Value }
+    return '"' + ($Value -replace '"', '\"') + '"'
+}
+
+function Resolve-CursorAgentNodeEntry {
+    $homes = New-Object System.Collections.Generic.List[string]
+
+    $agentCmd = Get-Command agent -ErrorAction SilentlyContinue
+    if ($agentCmd -and $agentCmd.Source) {
+        $src = $agentCmd.Source
+        if ($src -like "*.ps1" -or $src -like "*.cmd" -or $src -like "*.bat") {
+            [void]$homes.Add((Split-Path -Parent $src))
+        }
+    }
+
+    if ($env:LOCALAPPDATA) {
+        [void]$homes.Add((Join-Path $env:LOCALAPPDATA "cursor-agent"))
+    }
+    if ($env:HOME) {
+        [void]$homes.Add((Join-Path $env:HOME ".local/share/cursor-agent"))
+        [void]$homes.Add((Join-Path $env:HOME ".cursor-agent"))
+    }
+    if ($env:USERPROFILE) {
+        [void]$homes.Add((Join-Path $env:USERPROFILE ".local/share/cursor-agent"))
+    }
+
+    foreach ($home in ($homes | Select-Object -Unique)) {
+        if (-not (Test-Path $home)) { continue }
+
+        $versionsDir = Join-Path $home "versions"
+        if (-not (Test-Path $versionsDir)) { continue }
+
+        $versionName = $null
+        foreach ($vf in @("version", "version.txt", "CURRENT", "active")) {
+            $p = Join-Path $home $vf
+            if (Test-Path $p) {
+                $versionName = (Get-Content $p -Raw -ErrorAction SilentlyContinue).Trim()
+                if ($versionName) { break }
+            }
+        }
+        if (-not $versionName) {
+            $latest = Get-ChildItem $versionsDir -Directory -ErrorAction SilentlyContinue |
+                Sort-Object LastWriteTime -Descending |
+                Select-Object -First 1
+            if ($latest) { $versionName = $latest.Name }
+        }
+        if (-not $versionName) { continue }
+
+        $indexJs = Join-Path $versionsDir (Join-Path $versionName "index.js")
+        if (-not (Test-Path $indexJs)) { continue }
+
+        $nodePath = $null
+        foreach ($candidate in @(
+                (Join-Path $home "node.exe"),
+                (Join-Path $home "node"),
+                (Join-Path (Join-Path $versionsDir $versionName) "node.exe"),
+                (Join-Path (Join-Path $versionsDir $versionName) "node")
+            )) {
+            if (Test-Path $candidate) { $nodePath = $candidate; break }
+        }
+        if (-not $nodePath) {
+            $bundled = Get-ChildItem $home -Filter "node.exe" -Recurse -ErrorAction SilentlyContinue |
+                Select-Object -First 1
+            if ($bundled) { $nodePath = $bundled.FullName }
+        }
+        if (-not $nodePath) {
+            $nodeCmd = Get-Command node -ErrorAction SilentlyContinue
+            if ($nodeCmd) { $nodePath = $nodeCmd.Source }
+        }
+        if (-not $nodePath) { continue }
+
+        return @{ Node = $nodePath; Entry = $indexJs; Home = $home }
+    }
+
+    return $null
+}
+
+function Invoke-AgentUtf8 {
+    param(
+        [string[]]$AgentArgs,
+        [string]$ProjectDir
+    )
+
+    $utf8 = New-Object System.Text.UTF8Encoding $false
+    $entry = Resolve-CursorAgentNodeEntry
+    if ($entry) {
+        $psi = New-Object System.Diagnostics.ProcessStartInfo
+        $psi.FileName = $entry.Node
+        $allArgs = @($entry.Entry) + $AgentArgs
+        $psi.Arguments = ($allArgs | ForEach-Object { Quote-ProcessArg $_ }) -join " "
+        $psi.WorkingDirectory = $ProjectDir
+        $psi.UseShellExecute = $false
+        $psi.RedirectStandardOutput = $true
+        $psi.RedirectStandardError = $true
+        $psi.CreateNoWindow = $true
+        $psi.StandardOutputEncoding = $utf8
+        $psi.StandardErrorEncoding = $utf8
+
+        $proc = New-Object System.Diagnostics.Process
+        $proc.StartInfo = $psi
+        [void]$proc.Start()
+        $stdout = $proc.StandardOutput.ReadToEnd()
+        $stderr = $proc.StandardError.ReadToEnd()
+        $proc.WaitForExit()
+
+        return @{
+            ExitCode = $proc.ExitCode
+            Text     = $stdout.Trim()
+            StdErr   = $stderr.Trim()
+        }
+    }
+
+    # Fallback: PowerShell pipeline with UTF-8 console decoding (may still mangle on some hosts)
+    $agentPath = Find-CursorAgent
+    if (-not $agentPath) {
+        return $null
+    }
+
+    $exeName = [System.IO.Path]::GetFileNameWithoutExtension($agentPath).ToLowerInvariant()
+    $invokeArgs = $AgentArgs
+    if ($exeName -eq "cursor") {
+        $invokeArgs = @("agent") + $AgentArgs
+    }
+
+    $prevEap = $ErrorActionPreference
+    $prevOutEnc = [Console]::OutputEncoding
+    $prevOutputEncoding = $OutputEncoding
+    $ErrorActionPreference = "Continue"
+    try {
+        try { cmd /c "chcp 65001 >nul" | Out-Null } catch { }
+        [Console]::OutputEncoding = $utf8
+        $OutputEncoding = $utf8
+        $raw = & $agentPath @invokeArgs 2>&1
+        $exitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $prevEap
+        [Console]::OutputEncoding = $prevOutEnc
+        $OutputEncoding = $prevOutputEncoding
+    }
+
+    $text = (
+        $raw |
+        ForEach-Object {
+            if ($_ -is [System.Management.Automation.ErrorRecord]) { $_.ToString() } else { "$_" }
+        } |
+        Out-String
+    ).Trim()
+
+    return @{
+        ExitCode = $exitCode
+        Text     = $text
+        StdErr   = ""
+    }
+}
+
 function Get-AgentReleaseNotes {
     param(
         [string]$PrevTag,
@@ -48,8 +216,7 @@ function Get-AgentReleaseNotes {
         [string]$ProjectDir
     )
 
-    $agentPath = Find-CursorAgent
-    if (-not $agentPath) {
+    if (-not (Find-CursorAgent) -and -not (Resolve-CursorAgentNodeEntry)) {
         Write-Warning "Cursor agent CLI not found on PATH. Falling back to commit subjects."
         return $null
     }
@@ -107,7 +274,7 @@ Write release notes in Vietnamese, clear and friendly:
 - Short bullets; no preamble, no closing remarks, no code fences around the whole note.
 - Output ONLY the release notes markdown.
 "@
-    Set-Content -Path $requestFile -Value $requestBody -Encoding utf8
+    Write-Utf8File -Path $requestFile -Content $requestBody
 
     # Short single-line prompt only — no leading dashes, no newlines.
     $shortPrompt = "Read the file .release-notes-request.md in the workspace root and follow its instructions exactly."
@@ -124,34 +291,21 @@ Write release notes in Vietnamese, clear and friendly:
         $shortPrompt
     )
 
-    # `cursor agent ...` when only `cursor` is on PATH
-    $exeName = [System.IO.Path]::GetFileNameWithoutExtension($agentPath).ToLowerInvariant()
-    if ($exeName -eq "cursor") {
-        $agentArgs = @("agent") + $agentArgs
-    }
-
-    # Native stderr becomes ErrorRecords under 2>&1; with ErrorActionPreference=Stop
-    # that would abort the whole release even on a successful agent run.
-    $prevEap = $ErrorActionPreference
-    $ErrorActionPreference = "Continue"
     try {
-        $raw = & $agentPath @agentArgs 2>&1
-        $exitCode = $LASTEXITCODE
+        $result = Invoke-AgentUtf8 -AgentArgs $agentArgs -ProjectDir $ProjectDir
     } finally {
-        $ErrorActionPreference = $prevEap
         Remove-Item -Force $requestFile -ErrorAction SilentlyContinue
     }
 
-    $text = (
-        $raw |
-        ForEach-Object {
-            if ($_ -is [System.Management.Automation.ErrorRecord]) { $_.ToString() } else { "$_" }
-        } |
-        Out-String
-    ).Trim()
+    if (-not $result) {
+        Write-Warning "Could not invoke Cursor agent. Falling back to commit subjects."
+        return $null
+    }
 
-    if ($exitCode -ne 0 -or [string]::IsNullOrWhiteSpace($text)) {
-        Write-Warning "Agent failed (exit $exitCode). Falling back to commit subjects."
+    $text = $result.Text
+    if ($result.ExitCode -ne 0 -or [string]::IsNullOrWhiteSpace($text)) {
+        Write-Warning "Agent failed (exit $($result.ExitCode)). Falling back to commit subjects."
+        if ($result.StdErr) { Write-Host $result.StdErr -ForegroundColor DarkYellow }
         if ($text) { Write-Host $text -ForegroundColor DarkYellow }
         return $null
     }
@@ -159,6 +313,12 @@ Write release notes in Vietnamese, clear and friendly:
     # Strip accidental outer markdown fences
     if ($text -match '(?s)^```(?:markdown|md)?\r?\n(?<body>.*)\r?\n```\s*$') {
         $text = $Matches['body'].Trim()
+    }
+
+    # Detect classic UTF-8-as-CP437 mojibake (e.g. T├¡nh)
+    if ($text -match '[├─└┌ß╞╗]') {
+        Write-Warning "Agent output looks encoding-corrupted. Falling back to commit subjects."
+        return $null
     }
 
     return $text
@@ -264,7 +424,7 @@ if ($LASTEXITCODE -eq 0) {
 
     if ($assets.Count -gt 0) {
         $notesFile = Join-Path ([System.IO.Path]::GetTempPath()) "xemanh-v$newVer-notes.md"
-        Set-Content -Path $notesFile -Value $releaseNotes -Encoding utf8
+        Write-Utf8File -Path $notesFile -Content $releaseNotes
         try {
             gh release create "v$newVer" $assets --title "v$newVer" --notes-file $notesFile
         } finally {

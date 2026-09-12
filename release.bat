@@ -2,6 +2,10 @@
 setlocal
 cd /d "%~dp0"
 
+REM UTF-8 so Vietnamese release notes survive agent stdout / console I/O
+chcp 65001 >nul
+set PYTHONUTF8=1
+
 echo =========================================
 echo       XemAnh Automatic Release Script
 echo =========================================
