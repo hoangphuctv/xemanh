@@ -214,3 +214,5 @@ if [[ "$IS_RELEASE" == "true" ]]; then
   gh release upload "$LATEST_TAG" "$DMG_PATH" --clobber
   echo "[SUCCESS] DMG uploaded successfully to release $LATEST_TAG."
 fi
+
+git co master
