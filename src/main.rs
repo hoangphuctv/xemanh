@@ -30,8 +30,18 @@ fn window_conf() -> Conf {
 
 #[macroquad::main(window_conf)]
 async fn main() -> Result<(), Box<dyn Error>> {
+    #[cfg(target_os = "macos")]
+    {
+        platform::install_open_document_handler();
+        next_frame().await;
+    }
+
     // Unicode-safe on Windows (Chinese / CJK paths); args() would be lossy.
     let arg = std::env::args_os().nth(1).map(PathBuf::from);
+
+    #[cfg(target_os = "macos")]
+    let arg = platform::take_open_document().or(arg);
+
     let gallery = Gallery::from_startup_arg(arg)?;
     let mut app = App::new(gallery).await?;
     app.update_title();

@@ -1,9 +1,81 @@
 //! macOS window placement and screen metrics.
 
-use objc::runtime::Object;
+use objc::runtime::{self, Object};
 use objc::{class, msg_send, sel, sel_impl};
+use std::ffi::{CStr, OsString};
+use std::os::unix::ffi::OsStringExt;
+use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Mutex, OnceLock};
 
 type ObjcId = *mut Object;
+
+static OPEN_DOCUMENT: OnceLock<Mutex<Option<PathBuf>>> = OnceLock::new();
+static OPEN_DOCUMENT_HANDLER_INSTALLED: AtomicBool = AtomicBool::new(false);
+
+fn open_document_slot() -> &'static Mutex<Option<PathBuf>> {
+    OPEN_DOCUMENT.get_or_init(|| Mutex::new(None))
+}
+
+extern "C" fn application_open_files(
+    _this: &mut Object,
+    _: objc::runtime::Sel,
+    _application: ObjcId,
+    filenames: ObjcId,
+) {
+    if filenames.is_null() {
+        return;
+    }
+
+    unsafe {
+        let count: usize = msg_send![filenames, count];
+        if count == 0 {
+            return;
+        }
+
+        let filename: ObjcId = msg_send![filenames, objectAtIndex: 0usize];
+        if filename.is_null() {
+            return;
+        }
+
+        let bytes: *const std::ffi::c_char =
+            msg_send![filename, fileSystemRepresentation];
+        if bytes.is_null() {
+            return;
+        }
+
+        let path = PathBuf::from(OsString::from_vec(
+            CStr::from_ptr(bytes).to_bytes().to_vec(),
+        ));
+
+        if let Ok(mut slot) = open_document_slot().lock() {
+            *slot = Some(path);
+        }
+    }
+}
+
+pub fn install_open_document_handler() {
+    if OPEN_DOCUMENT_HANDLER_INSTALLED.swap(true, Ordering::AcqRel) {
+        return;
+    }
+
+    unsafe {
+        let delegate = class!(NSAppDelegate) as *const _ as *mut _;
+        let types = b"v@:@@\0";
+
+        let imp: runtime::Imp = std::mem::transmute(application_open_files as unsafe extern "C" fn(&mut Object, objc::runtime::Sel, ObjcId, ObjcId));
+        runtime::class_addMethod(
+            delegate,
+            sel!(application:openFiles:),
+            imp,
+            types.as_ptr().cast(),
+        );
+    }
+}
+
+pub fn take_open_document() -> Option<PathBuf> {
+    open_document_slot().lock().ok()?.take()
+}
 
 #[repr(C)]
 #[derive(Copy, Clone)]

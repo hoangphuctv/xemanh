@@ -8,6 +8,9 @@ mod macos;
 
 pub use win32::*;
 
+#[cfg(target_os = "macos")]
+pub use macos::{install_open_document_handler, take_open_document};
+
 /// Resizes the window for auto-fit. On macOS uses logical points and centers the
 /// window; elsewhere delegates to macroquad (which scales by DPI for Win32, etc.).
 pub fn request_window_size(width: f32, height: f32) {
