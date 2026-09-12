@@ -12,3 +12,4 @@ installer/*.exe
 .bridge-output/
 output.txt
 *.log
+.DS_Store
