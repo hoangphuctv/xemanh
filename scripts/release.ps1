@@ -77,7 +77,10 @@ function Get-AgentReleaseNotes {
         $diffPatch = $diffPatch.Substring(0, $maxDiffChars) + "`n... [diff truncated for size] ..."
     }
 
-    $prompt = @"
+    # Write the full prompt to a file. Passing a large multiline prompt (with diff
+    # lines starting with "-") as CLI argv gets split and misparsed as options.
+    $requestFile = Join-Path $ProjectDir ".release-notes-request.md"
+    $requestBody = @"
 You are writing GitHub Release notes for XemAnh v$NewVer.
 
 XemAnh is a lightweight image viewer for Windows & Linux. Readers are end users (not developers).
@@ -104,6 +107,10 @@ Write release notes in Vietnamese, clear and friendly:
 - Short bullets; no preamble, no closing remarks, no code fences around the whole note.
 - Output ONLY the release notes markdown.
 "@
+    Set-Content -Path $requestFile -Value $requestBody -Encoding utf8
+
+    # Short single-line prompt only — no leading dashes, no newlines.
+    $shortPrompt = "Read the file .release-notes-request.md in the workspace root and follow its instructions exactly."
 
     Write-Host "==> Asking Cursor agent to draft release notes from git diff..." -ForegroundColor Yellow
 
@@ -113,7 +120,8 @@ Write release notes in Vietnamese, clear and friendly:
         "--trust",
         "--workspace", $ProjectDir,
         "--output-format", "text",
-        $prompt
+        "--",
+        $shortPrompt
     )
 
     # `cursor agent ...` when only `cursor` is on PATH
@@ -122,9 +130,25 @@ Write release notes in Vietnamese, clear and friendly:
         $agentArgs = @("agent") + $agentArgs
     }
 
-    $raw = & $agentPath @agentArgs 2>&1
-    $exitCode = $LASTEXITCODE
-    $text = ($raw | Out-String).Trim()
+    # Native stderr becomes ErrorRecords under 2>&1; with ErrorActionPreference=Stop
+    # that would abort the whole release even on a successful agent run.
+    $prevEap = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $raw = & $agentPath @agentArgs 2>&1
+        $exitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $prevEap
+        Remove-Item -Force $requestFile -ErrorAction SilentlyContinue
+    }
+
+    $text = (
+        $raw |
+        ForEach-Object {
+            if ($_ -is [System.Management.Automation.ErrorRecord]) { $_.ToString() } else { "$_" }
+        } |
+        Out-String
+    ).Trim()
 
     if ($exitCode -ne 0 -or [string]::IsNullOrWhiteSpace($text)) {
         Write-Warning "Agent failed (exit $exitCode). Falling back to commit subjects."

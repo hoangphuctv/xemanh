@@ -10,6 +10,7 @@
 installer/*.deb
 installer/*.exe
 .bridge-output/
+.release-notes-request.md
 output.txt
 *.log
 .DS_Store
