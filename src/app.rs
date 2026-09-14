@@ -1076,7 +1076,7 @@ impl App {
         }
 
         // Draw toolbar on top of everything
-        self.toolbar.draw(win_w, win_h);
+        self.toolbar.draw(win_w, win_h, &self.font);
         self.draw_overlay();
 
         true

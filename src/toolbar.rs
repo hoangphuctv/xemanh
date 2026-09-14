@@ -13,7 +13,6 @@ pub struct Toolbar {
 
 #[derive(Clone, Copy)]
 pub struct ToolbarButton {
-    pub label: &'static str,
     pub action: ToolbarAction,
     pub rect: Rect,
 }
@@ -41,21 +40,16 @@ impl Toolbar {
     }
 
     pub fn update_buttons(&mut self, win_w: f32, _win_h: f32) {
-        let btn_h = 28.0;
-        let toggle_w = 32.0;
+        let btn_h = 30.0;
+        let toggle_w = 34.0;
         let toggle_margin = 8.0;
         let y = (TOOLBAR_HEIGHT - btn_h) / 2.0;
 
-        self.toggle_rect = Rect::new(
-            win_w - toggle_w - toggle_margin,
-            y,
-            toggle_w,
-            btn_h,
-        );
+        self.toggle_rect = Rect::new(win_w - toggle_w - toggle_margin, y, toggle_w, btn_h);
 
         let count = 6;
-        let spacing = 6.0;
-        let button_w = 56.0;
+        let spacing = 7.0;
+        let button_w = 38.0;
         let total_w = count as f32 * button_w + (count - 1) as f32 * spacing;
         let start_x = (win_w - total_w) / 2.0;
 
@@ -73,12 +67,10 @@ impl Toolbar {
             ToolbarAction::ResetView,
             ToolbarAction::ZoomIn,
         ];
-        let labels = ["Crop", "<", ">", "-", "100%", "+"];
 
-        for (i, (&action, &label)) in actions.iter().zip(labels.iter()).enumerate() {
+        for (i, &action) in actions.iter().enumerate() {
             let x = start_x + i as f32 * (button_w + spacing);
             self.buttons.push(ToolbarButton {
-                label,
                 action,
                 rect: Rect::new(x, y, button_w, btn_h),
             });
@@ -124,11 +116,11 @@ impl Toolbar {
         None
     }
 
-    pub fn draw(&self, win_w: f32, _win_h: f32) {
-        let btn_color = Color::new(0.2, 0.2, 0.2, 0.85);
-        let btn_hover_color = Color::new(0.4, 0.4, 0.4, 0.95);
-        let border_color = Color::new(1.0, 1.0, 1.0, 0.2);
-        let text_color = WHITE;
+    pub fn draw(&self, win_w: f32, _win_h: f32, font: &Font) {
+        let btn_color = Color::new(0.14, 0.16, 0.20, 0.96);
+        let btn_hover_color = Color::new(0.10, 0.45, 0.67, 1.0);
+        let border_color = Color::new(0.72, 0.82, 0.92, 0.18);
+        let icon_color = Color::new(0.91, 0.95, 1.0, 1.0);
 
         if !self.visible {
             let color = if self.toggle_hovered {
@@ -136,33 +128,21 @@ impl Toolbar {
             } else {
                 btn_color
             };
-            draw_rectangle(
-                self.toggle_rect.x,
-                self.toggle_rect.y,
-                self.toggle_rect.w,
-                self.toggle_rect.h,
-                color,
-            );
-            draw_rectangle_lines(
-                self.toggle_rect.x,
-                self.toggle_rect.y,
-                self.toggle_rect.w,
-                self.toggle_rect.h,
-                1.0,
-                border_color,
-            );
-            let font_size = 14.0;
-            let label = "v";
-            let dims = measure_text(label, None, font_size as u16, 1.0);
-            let tx = self.toggle_rect.x + (self.toggle_rect.w - dims.width) / 2.0;
-            let ty = self.toggle_rect.y + (self.toggle_rect.h - dims.height) / 2.0 + font_size * 0.35;
-            draw_text(label, tx, ty, font_size, text_color);
+            draw_button(self.toggle_rect, color, border_color);
+            draw_vertical_chevron(self.toggle_rect.center(), false, icon_color);
             return;
         }
 
-        let bg_color = Color::new(0.1, 0.1, 0.1, 0.92);
+        let bg_color = Color::new(0.055, 0.065, 0.09, 0.94);
         draw_rectangle(0.0, 0.0, win_w, TOOLBAR_HEIGHT, bg_color);
-        draw_line(0.0, TOOLBAR_HEIGHT, win_w, TOOLBAR_HEIGHT, 1.0, Color::new(1.0, 1.0, 1.0, 0.1));
+        draw_line(
+            0.0,
+            TOOLBAR_HEIGHT,
+            win_w,
+            TOOLBAR_HEIGHT,
+            1.0,
+            Color::new(1.0, 1.0, 1.0, 0.1),
+        );
 
         for (i, btn) in self.buttons.iter().enumerate() {
             let color = if Some(i) == self.hovered {
@@ -170,38 +150,11 @@ impl Toolbar {
             } else {
                 btn_color
             };
-            draw_rectangle(btn.rect.x, btn.rect.y, btn.rect.w, btn.rect.h, color);
-            draw_rectangle_lines(
-                btn.rect.x,
-                btn.rect.y,
-                btn.rect.w,
-                btn.rect.h,
-                1.0,
-                border_color,
-            );
+            draw_button(btn.rect, color, border_color);
+            draw_action_icon(btn.action, btn.rect.center(), icon_color);
 
-            if btn.action == ToolbarAction::Crop {
-                // Draw custom crop icon (scissors / frame icon) directly with vector lines
-                let icon_color = text_color;
-                let cx = btn.rect.x + btn.rect.w / 2.0;
-                let cy = btn.rect.y + btn.rect.h / 2.0;
-                let sz = 6.0;
-
-                // Outer crop frame corners
-                draw_line(cx - sz, cy - sz, cx + sz, cy - sz, 2.0, icon_color);
-                draw_line(cx + sz, cy - sz, cx + sz, cy + sz, 2.0, icon_color);
-                draw_line(cx + sz, cy + sz, cx - sz, cy + sz, 2.0, icon_color);
-                draw_line(cx - sz, cy + sz, cx - sz, cy - sz, 2.0, icon_color);
-                
-                // Extending crop marks
-                draw_line(cx - sz - 3.0, cy - sz, cx - sz, cy - sz, 1.5, icon_color);
-                draw_line(cx + sz + 3.0, cy + sz, cx + sz, cy + sz, 1.5, icon_color);
-            } else {
-                let font_size = 18.0;
-                let text_dims = measure_text(btn.label, None, font_size as u16, 1.0);
-                let tx = btn.rect.x + (btn.rect.w - text_dims.width) / 2.0;
-                let ty = btn.rect.y + (btn.rect.h - text_dims.height) / 2.0 + font_size * 0.35;
-                draw_text(btn.label, tx, ty, font_size, text_color);
+            if Some(i) == self.hovered {
+                draw_tooltip(action_name(btn.action), btn.rect, font);
             }
         }
 
@@ -211,26 +164,153 @@ impl Toolbar {
         } else {
             btn_color
         };
-        draw_rectangle(
-            self.toggle_rect.x,
-            self.toggle_rect.y,
-            self.toggle_rect.w,
-            self.toggle_rect.h,
-            t_color,
-        );
-        draw_rectangle_lines(
-            self.toggle_rect.x,
-            self.toggle_rect.y,
-            self.toggle_rect.w,
-            self.toggle_rect.h,
-            1.0,
-            border_color,
-        );
-        let font_size = 14.0;
-        let label = "^";
-        let dims = measure_text(label, None, font_size as u16, 1.0);
-        let tx = self.toggle_rect.x + (self.toggle_rect.w - dims.width) / 2.0;
-        let ty = self.toggle_rect.y + (self.toggle_rect.h - dims.height) / 2.0 + font_size * 0.35;
-        draw_text(label, tx, ty, font_size, text_color);
+        draw_button(self.toggle_rect, t_color, border_color);
+        draw_vertical_chevron(self.toggle_rect.center(), true, icon_color);
     }
+}
+
+fn draw_button(rect: Rect, fill: Color, border: Color) {
+    draw_rounded_rect(rect, 7.0, border);
+    draw_rounded_rect(
+        Rect::new(rect.x + 1.0, rect.y + 1.0, rect.w - 2.0, rect.h - 2.0),
+        6.0,
+        fill,
+    );
+}
+
+fn draw_rounded_rect(rect: Rect, radius: f32, color: Color) {
+    draw_rectangle(
+        rect.x + radius,
+        rect.y,
+        rect.w - radius * 2.0,
+        rect.h,
+        color,
+    );
+    draw_rectangle(
+        rect.x,
+        rect.y + radius,
+        rect.w,
+        rect.h - radius * 2.0,
+        color,
+    );
+    for (x, y) in [
+        (rect.x + radius, rect.y + radius),
+        (rect.x + rect.w - radius, rect.y + radius),
+        (rect.x + radius, rect.y + rect.h - radius),
+        (rect.x + rect.w - radius, rect.y + rect.h - radius),
+    ] {
+        draw_circle(x, y, radius, color);
+    }
+}
+
+fn draw_action_icon(action: ToolbarAction, center: Vec2, color: Color) {
+    match action {
+        ToolbarAction::Prev => draw_chevron(center, true, color),
+        ToolbarAction::Next => draw_chevron(center, false, color),
+        ToolbarAction::Crop => draw_crop_icon(center, color),
+        ToolbarAction::ZoomIn => draw_zoom_icon(center, true, color),
+        ToolbarAction::ZoomOut => draw_zoom_icon(center, false, color),
+        ToolbarAction::ResetView => draw_reset_label(center, color),
+    }
+}
+
+fn draw_chevron(center: Vec2, left: bool, color: Color) {
+    let direction = if left { 1.0 } else { -1.0 };
+    draw_line(
+        center.x + direction * 3.0,
+        center.y - 7.0,
+        center.x - direction * 4.0,
+        center.y,
+        2.3,
+        color,
+    );
+    draw_line(
+        center.x - direction * 4.0,
+        center.y,
+        center.x + direction * 3.0,
+        center.y + 7.0,
+        2.3,
+        color,
+    );
+}
+
+fn draw_vertical_chevron(center: Vec2, up: bool, color: Color) {
+    let direction = if up { 1.0 } else { -1.0 };
+    draw_line(
+        center.x - 7.0,
+        center.y + direction * 3.0,
+        center.x,
+        center.y - direction * 4.0,
+        2.3,
+        color,
+    );
+    draw_line(
+        center.x,
+        center.y - direction * 4.0,
+        center.x + 7.0,
+        center.y + direction * 3.0,
+        2.3,
+        color,
+    );
+}
+
+fn draw_crop_icon(c: Vec2, color: Color) {
+    let s = 7.0;
+    draw_line(c.x - s, c.y - 4.0, c.x + 4.0, c.y - 4.0, 2.0, color);
+    draw_line(c.x - 4.0, c.y - s, c.x - 4.0, c.y + 4.0, 2.0, color);
+    draw_line(c.x + s, c.y + 4.0, c.x - 4.0, c.y + 4.0, 2.0, color);
+    draw_line(c.x + 4.0, c.y + s, c.x + 4.0, c.y - 4.0, 2.0, color);
+}
+
+fn draw_zoom_icon(c: Vec2, plus: bool, color: Color) {
+    draw_circle_lines(c.x - 2.5, c.y - 2.5, 6.0, 2.0, color);
+    draw_line(c.x + 2.0, c.y + 2.0, c.x + 7.5, c.y + 7.5, 2.2, color);
+    draw_line(c.x - 5.5, c.y - 2.5, c.x + 0.5, c.y - 2.5, 1.7, color);
+    if plus {
+        draw_line(c.x - 2.5, c.y - 5.5, c.x - 2.5, c.y + 0.5, 1.7, color);
+    }
+}
+
+fn draw_reset_label(c: Vec2, color: Color) {
+    const LABEL: &str = "100%";
+    let font_size = 13.0;
+    let dims = measure_text(LABEL, None, font_size as u16, 1.0);
+    draw_text(
+        LABEL,
+        c.x - dims.width / 2.0,
+        c.y + dims.height * 0.35,
+        font_size,
+        color,
+    );
+}
+
+fn action_name(action: ToolbarAction) -> &'static str {
+    match action {
+        ToolbarAction::Prev => "Ảnh trước",
+        ToolbarAction::Next => "Ảnh tiếp",
+        ToolbarAction::Crop => "Cắt ảnh",
+        ToolbarAction::ZoomIn => "Phóng to",
+        ToolbarAction::ZoomOut => "Thu nhỏ",
+        ToolbarAction::ResetView => "Đặt lại tỷ lệ",
+    }
+}
+
+fn draw_tooltip(label: &str, button: Rect, font: &Font) {
+    let font_size = 14.0;
+    let dims = measure_text(label, Some(font), font_size as u16, 1.0);
+    let width = dims.width + 14.0;
+    let x = button.x + (button.w - width) / 2.0;
+    let y = TOOLBAR_HEIGHT + 7.0;
+    draw_rectangle(x, y, width, 23.0, Color::new(0.03, 0.04, 0.06, 0.92));
+    draw_text_ex(
+        label,
+        x + 7.0,
+        y + 16.5,
+        TextParams {
+            font: Some(font),
+            font_size: font_size as u16,
+            color: Color::new(0.94, 0.97, 1.0, 1.0),
+            ..Default::default()
+        },
+    );
 }
