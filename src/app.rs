@@ -1,4 +1,5 @@
 use std::path::{Path, PathBuf};
+use std::fs;
 use std::time::Duration;
 
 use macroquad::prelude::*;
@@ -935,11 +936,40 @@ impl App {
             let name = file_name_of(&path);
             let width = self.texture.width();
             let height = self.texture.height();
+            let format = path
+                .extension()
+                .and_then(|ext| ext.to_str())
+                .unwrap_or("Không rõ")
+                .to_uppercase();
+            let file_size = fs::metadata(&path)
+                .map(|metadata| {
+                    let bytes = metadata.len();
+                    if bytes >= 1024 * 1024 {
+                        format!("{:.1} MB", bytes as f64 / (1024.0 * 1024.0))
+                    } else if bytes >= 1024 {
+                        format!("{:.1} KB", bytes as f64 / 1024.0)
+                    } else {
+                        format!("{} B", bytes)
+                    }
+                })
+                .unwrap_or_else(|_| "Không rõ".to_string());
 
-            let lines = [
+            let color_type = format!("{:?}", self.image.color_type());
+            let mut lines = vec![
                 name,
                 format!("Kích thước: {:.0} × {:.0} px", width, height),
+                format!("Định dạng: {}", format),
+                format!("Dung lượng: {}", file_size),
+                format!("Màu: {}", color_type),
             ];
+
+            if let Some((current_frame, frame_count, total_duration)) = self.image.animation_info() {
+                lines.push(format!("Frame: {} / {}", current_frame, frame_count));
+                lines.push(format!(
+                    "Thời lượng: {:.2} giây",
+                    total_duration.as_secs_f64()
+                ));
+            }
             let font_size = 24u16;
             let line_height = 36.0;
             let padding = 24.0;
