@@ -11,6 +11,7 @@ use crate::gallery::{file_name_of, Gallery};
 use crate::image_io::{make_checkerboard, LoadedImage, Rot};
 use crate::platform;
 use crate::toolbar::{Toolbar, ToolbarAction, TOOLBAR_HEIGHT};
+use crate::updater::{UpdatePoll, Updater};
 use crate::view::ViewState;
 
 struct Toast {
@@ -75,6 +76,7 @@ pub struct App {
     toolbar: Toolbar,
     last_mouse_move: f64,
     crop_state: CropState,
+    updater: Updater,
 }
 
 impl App {
@@ -162,6 +164,7 @@ impl App {
             toolbar: Toolbar::new(),
             last_mouse_move: 0.0,
             crop_state: CropState::default(),
+            updater: Updater::new(),
         })
     }
 
@@ -1011,6 +1014,12 @@ impl App {
     }
 
     pub fn update(&mut self) -> bool {
+        match self.updater.poll() {
+            UpdatePoll::None | UpdatePoll::Downloading => {}
+            UpdatePoll::Error(message) => self.set_toast(message, true),
+            UpdatePoll::LaunchInstaller => return false,
+        }
+
         self.sync_window_state();
         self.handle_dropped_files();
 

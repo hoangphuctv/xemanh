@@ -6,6 +6,7 @@ mod gallery;
 mod image_io;
 mod platform;
 mod toolbar;
+mod updater;
 mod view;
 
 use std::error::Error;
