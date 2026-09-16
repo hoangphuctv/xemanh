@@ -75,6 +75,9 @@ pub struct App {
     dragging: bool,
     toolbar: Toolbar,
     last_mouse_move: f64,
+    slideshow_active: bool,
+    slideshow_elapsed: f32,
+    slideshow_interval: f32,
     crop_state: CropState,
     updater: Updater,
 }
@@ -163,6 +166,9 @@ impl App {
             dragging: false,
             toolbar: Toolbar::new(),
             last_mouse_move: 0.0,
+            slideshow_active: false,
+            slideshow_elapsed: 0.0,
+            slideshow_interval: 3.0,
             crop_state: CropState::default(),
             updater: Updater::new(),
         })
@@ -316,13 +322,51 @@ impl App {
     fn next_image(&mut self) {
         if let Some(next) = self.gallery.next_index() {
             self.load_index(next);
+            self.slideshow_elapsed = 0.0;
         }
     }
 
     fn prev_image(&mut self) {
         if let Some(prev) = self.gallery.prev_index() {
             self.load_index(prev);
+            self.slideshow_elapsed = 0.0;
         }
+    }
+
+    fn toggle_slideshow(&mut self) {
+        if self.gallery.next_index().is_none() {
+            self.slideshow_active = false;
+            self.slideshow_elapsed = 0.0;
+            self.set_toast("Cần ít nhất 2 ảnh để Slideshow", true);
+            return;
+        }
+
+        self.slideshow_active = !self.slideshow_active;
+        self.slideshow_elapsed = 0.0;
+
+        if self.slideshow_active {
+            self.set_toast(
+                format!("Slideshow: {} giây", self.slideshow_interval),
+                false,
+            );
+        } else {
+            self.set_toast("Slideshow dừng", false);
+        }
+    }
+
+    fn cycle_slideshow_interval(&mut self) {
+        const INTERVALS: [f32; 5] = [1.0, 2.0, 3.0, 5.0, 10.0];
+
+        let current = INTERVALS
+            .iter()
+            .position(|&value| value == self.slideshow_interval)
+            .unwrap_or(2);
+        self.slideshow_interval = INTERVALS[(current + 1) % INTERVALS.len()];
+        self.slideshow_elapsed = 0.0;
+        self.set_toast(
+            format!("Khoảng thời gian: {} giây", self.slideshow_interval),
+            false,
+        );
     }
 
     fn toggle_fullscreen(&mut self) {
@@ -728,6 +772,8 @@ impl App {
                 match action {
                     ToolbarAction::Prev => self.prev_image(),
                     ToolbarAction::Next => self.next_image(),
+                    ToolbarAction::Play => self.toggle_slideshow(),
+                    ToolbarAction::Interval => self.cycle_slideshow_interval(),
                     ToolbarAction::ZoomIn => {
                         let factor = ZOOM_PER_NOTCH;
                         self.view.zoom_at_mouse(
@@ -1030,6 +1076,13 @@ impl App {
         let dt = get_frame_time();
         self.view.tick_zoom(dt);
 
+        if self.slideshow_active {
+            self.slideshow_elapsed += dt;
+            if self.slideshow_elapsed >= self.slideshow_interval {
+                self.next_image();
+            }
+        }
+
         // Tick animation if current image is animated
         if let Some(anim) = self.image.animation_mut() {
             let d = Duration::from_secs_f32(dt);
@@ -1085,6 +1138,7 @@ impl App {
         }
 
         // Draw toolbar on top of everything
+        self.toolbar.slideshow_active = self.slideshow_active;
         self.toolbar.draw(win_w, win_h, &self.font);
         self.draw_overlay();
 
