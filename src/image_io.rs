@@ -117,6 +117,23 @@ impl LoadedImage {
         &self.rgba
     }
 
+    pub fn color_type(&self) -> image::ColorType {
+        self.inner.color()
+    }
+
+    pub fn animation_info(&self) -> Option<(usize, usize, Duration)> {
+        self.animation.as_ref().map(|animation| {
+            let frame_count = animation.frames.len();
+            let current_frame = animation.current_frame + 1;
+            let total_duration = animation
+                .frame_durations
+                .iter()
+                .copied()
+                .fold(Duration::ZERO, |total, duration| total + duration);
+            (current_frame, frame_count, total_duration)
+        })
+    }
+
     pub fn animation_mut(&mut self) -> Option<&mut ImageAnimation> {
         self.animation.as_mut()
     }
