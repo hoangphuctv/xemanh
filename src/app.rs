@@ -29,6 +29,15 @@ pub struct CropState {
     pub start_pos: Option<Vec2>,
     pub current_pos: Vec2,
     pub dragging: bool,
+    pub fixed_w_str: String,
+    pub fixed_h_str: String,
+    pub active_input: Option<CropInputFocus>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum CropInputFocus {
+    Width,
+    Height,
 }
 
 impl CropState {
@@ -37,6 +46,19 @@ impl CropState {
         self.start_pos = None;
         self.current_pos = Vec2::ZERO;
         self.dragging = false;
+        self.fixed_w_str.clear();
+        self.fixed_h_str.clear();
+        self.active_input = None;
+    }
+
+    pub fn get_fixed_size(&self) -> Option<(u32, u32)> {
+        let w = self.fixed_w_str.trim().parse::<u32>().ok()?;
+        let h = self.fixed_h_str.trim().parse::<u32>().ok()?;
+        if w > 0 && h > 0 {
+            Some((w, h))
+        } else {
+            None
+        }
     }
 
     pub fn get_selection_rect(&self) -> Option<Rect> {
@@ -559,16 +581,37 @@ impl App {
         };
         let img_rect = self.view.view_rect(tex_w, tex_h, win_w, available_h, top_offset);
 
-        // Convert screen crop rect to texture pixel space
-        let rel_x = (crop_rect.x - img_rect.x) / img_rect.w;
-        let rel_y = (crop_rect.y - img_rect.y) / img_rect.h;
-        let rel_w = crop_rect.w / img_rect.w;
-        let rel_h = crop_rect.h / img_rect.h;
+        let fixed_size = self.crop_state.get_fixed_size();
+        let (x, y, w, h) = if let Some((fixed_w, fixed_h)) = fixed_size {
+            let image_w = tex_w.round() as u32;
+            let image_h = tex_h.round() as u32;
+            if fixed_w > image_w || fixed_h > image_h {
+                self.set_toast("Kích thước crop lớn hơn ảnh gốc", true);
+                return;
+            }
 
-        let x = (rel_x * tex_w).round().max(0.0) as u32;
-        let y = (rel_y * tex_h).round().max(0.0) as u32;
-        let w = (rel_w * tex_w).round() as u32;
-        let h = (rel_h * tex_h).round() as u32;
+            let rel_x = (crop_rect.x - img_rect.x) / img_rect.w;
+            let rel_y = (crop_rect.y - img_rect.y) / img_rect.h;
+            let x = (rel_x * tex_w)
+                .round()
+                .clamp(0.0, (image_w - fixed_w) as f32) as u32;
+            let y = (rel_y * tex_h)
+                .round()
+                .clamp(0.0, (image_h - fixed_h) as f32) as u32;
+            (x, y, fixed_w, fixed_h)
+        } else {
+            // Convert screen crop rect to texture pixel space
+            let rel_x = (crop_rect.x - img_rect.x) / img_rect.w;
+            let rel_y = (crop_rect.y - img_rect.y) / img_rect.h;
+            let rel_w = crop_rect.w / img_rect.w;
+            let rel_h = crop_rect.h / img_rect.h;
+
+            let x = (rel_x * tex_w).round().max(0.0) as u32;
+            let y = (rel_y * tex_h).round().max(0.0) as u32;
+            let w = (rel_w * tex_w).round() as u32;
+            let h = (rel_h * tex_h).round() as u32;
+            (x, y, w, h)
+        };
 
         if w == 0 || h == 0 {
             self.set_toast("Vùng chọn cắt không hợp lệ", true);
@@ -702,6 +745,35 @@ impl App {
             self.load_index(self.gallery.len() - 1);
         }
 
+        if self.crop_state.active {
+            if is_key_pressed(KeyCode::Tab) {
+                self.crop_state.active_input = Some(match self.crop_state.active_input {
+                    Some(CropInputFocus::Width) => CropInputFocus::Height,
+                    _ => CropInputFocus::Width,
+                });
+                return true;
+            }
+
+            if is_key_pressed(KeyCode::Backspace) {
+                match self.crop_state.active_input {
+                    Some(CropInputFocus::Width) => { self.crop_state.fixed_w_str.pop(); }
+                    Some(CropInputFocus::Height) => { self.crop_state.fixed_h_str.pop(); }
+                    None => {}
+                }
+                return true;
+            }
+
+            while let Some(ch) = get_char_pressed() {
+                if ch.is_ascii_digit() {
+                    match self.crop_state.active_input {
+                        Some(CropInputFocus::Width) => self.crop_state.fixed_w_str.push(ch),
+                        Some(CropInputFocus::Height) => self.crop_state.fixed_h_str.push(ch),
+                        None => {}
+                    }
+                }
+            }
+        }
+
         // Rotate & save
         if is_key_pressed(KeyCode::I) {
             self.show_image_info = !self.show_image_info;
@@ -806,7 +878,8 @@ impl App {
                     ToolbarAction::Crop => {
                         self.crop_state.active = !self.crop_state.active;
                         if self.crop_state.active {
-                            self.set_toast("Chế độ cắt: Kéo chuột để chọn, Enter để cắt, Esc để hủy", false);
+                            self.crop_state.active_input = Some(CropInputFocus::Width);
+                            self.set_toast("Crop: nhập W/H (px), click/drag để đặt khung, Enter để cắt, Esc để hủy", false);
                         } else {
                             self.crop_state.reset();
                         }
@@ -829,18 +902,55 @@ impl App {
             // Match the `update()` viewport so crop coordinates line up.
             let img_rect = self.view.view_rect(tex_w, tex_h, win_w, available_h, top_offset);
 
+            let (width_rect, height_rect) = self.crop_input_rects(img_rect);
+
             if is_mouse_button_pressed(MouseButton::Left) {
-                let clamped_x = mouse.x.clamp(img_rect.x, img_rect.x + img_rect.w);
-                let clamped_y = mouse.y.clamp(img_rect.y, img_rect.y + img_rect.h);
-                self.crop_state.start_pos = Some(vec2(clamped_x, clamped_y));
-                self.crop_state.current_pos = vec2(clamped_x, clamped_y);
-                self.crop_state.dragging = true;
+                if width_rect.contains(mouse) {
+                    self.crop_state.active_input = Some(CropInputFocus::Width);
+                } else if height_rect.contains(mouse) {
+                    self.crop_state.active_input = Some(CropInputFocus::Height);
+                } else {
+                    let clamped_x = mouse.x.clamp(img_rect.x, img_rect.x + img_rect.w);
+                    let clamped_y = mouse.y.clamp(img_rect.y, img_rect.y + img_rect.h);
+
+                    if let Some((fixed_w, fixed_h)) = self.crop_state.get_fixed_size() {
+                        let screen_w = fixed_w as f32 * img_rect.w / tex_w;
+                        let screen_h = fixed_h as f32 * img_rect.h / tex_h;
+                        if screen_w > img_rect.w || screen_h > img_rect.h {
+                            self.set_toast("Kích thước crop lớn hơn ảnh gốc", true);
+                            self.crop_state.dragging = false;
+                        } else {
+                            let left = (clamped_x - screen_w / 2.0)
+                                .clamp(img_rect.x, img_rect.x + img_rect.w - screen_w);
+                            let top = (clamped_y - screen_h / 2.0)
+                                .clamp(img_rect.y, img_rect.y + img_rect.h - screen_h);
+                            self.crop_state.start_pos = Some(vec2(left, top));
+                            self.crop_state.current_pos = vec2(left + screen_w, top + screen_h);
+                            self.crop_state.dragging = true;
+                        }
+                    } else {
+                        self.crop_state.start_pos = Some(vec2(clamped_x, clamped_y));
+                        self.crop_state.current_pos = vec2(clamped_x, clamped_y);
+                        self.crop_state.dragging = true;
+                    }
+                }
             }
 
             if is_mouse_button_down(MouseButton::Left) && self.crop_state.dragging {
                 let clamped_x = mouse.x.clamp(img_rect.x, img_rect.x + img_rect.w);
                 let clamped_y = mouse.y.clamp(img_rect.y, img_rect.y + img_rect.h);
-                self.crop_state.current_pos = vec2(clamped_x, clamped_y);
+                if let Some((fixed_w, fixed_h)) = self.crop_state.get_fixed_size() {
+                    let screen_w = fixed_w as f32 * img_rect.w / tex_w;
+                    let screen_h = fixed_h as f32 * img_rect.h / tex_h;
+                    let left = (clamped_x - screen_w / 2.0)
+                        .clamp(img_rect.x, img_rect.x + img_rect.w - screen_w);
+                    let top = (clamped_y - screen_h / 2.0)
+                        .clamp(img_rect.y, img_rect.y + img_rect.h - screen_h);
+                    self.crop_state.start_pos = Some(vec2(left, top));
+                    self.crop_state.current_pos = vec2(left + screen_w, top + screen_h);
+                } else {
+                    self.crop_state.current_pos = vec2(clamped_x, clamped_y);
+                }
             }
 
             if is_mouse_button_released(MouseButton::Left) {
@@ -949,6 +1059,64 @@ impl App {
             // Dim whole image if no selection yet
             draw_rectangle(img_rect.x, img_rect.y, img_rect.w, img_rect.h, dim_color);
         }
+
+        let (width_rect, height_rect) = self.crop_input_rects(img_rect);
+        let fields = [
+            (
+                width_rect,
+                "W",
+                &self.crop_state.fixed_w_str,
+                self.crop_state.active_input == Some(CropInputFocus::Width),
+            ),
+            (
+                height_rect,
+                "H",
+                &self.crop_state.fixed_h_str,
+                self.crop_state.active_input == Some(CropInputFocus::Height),
+            ),
+        ];
+        for (rect, label, value, active) in fields {
+            draw_rectangle(rect.x, rect.y, rect.w, rect.h, Color::new(0.0, 0.0, 0.0, 0.8));
+            draw_rectangle_lines(
+                rect.x,
+                rect.y,
+                rect.w,
+                rect.h,
+                2.0,
+                if active { WHITE } else { GRAY },
+            );
+            let text = if value.is_empty() {
+                format!("{label}:")
+            } else {
+                format!("{label}: {value}")
+            };
+            draw_text_ex(
+                &text,
+                rect.x + 8.0,
+                rect.y + 23.0,
+                TextParams {
+                    font: Some(&self.font),
+                    font_size: 20,
+                    color: WHITE,
+                    ..Default::default()
+                },
+            );
+        }
+    }
+
+    fn crop_input_rects(&self, img_rect: Rect) -> (Rect, Rect) {
+        let x = img_rect.x + 12.0;
+        let y = img_rect.y + if self.fullscreen {
+            TOOLBAR_HEIGHT + 12.0
+        } else {
+            12.0
+        };
+        let w = 120.0;
+        let h = 34.0;
+        (
+            Rect::new(x, y, w, h),
+            Rect::new(x + w + 12.0, y, w, h),
+        )
     }
 
     fn draw_overlay(&self) {
