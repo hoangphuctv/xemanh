@@ -651,7 +651,7 @@ impl App {
         if is_key_pressed(KeyCode::Left) || is_key_pressed(KeyCode::PageUp) || is_key_pressed(KeyCode::Up) {
             self.prev_image();
         }
-        if is_key_pressed(KeyCode::Home) && !self.gallery.is_empty() {
+        if (is_key_pressed(KeyCode::Home) || is_key_pressed(KeyCode::Key1)) && !self.gallery.is_empty() {
             self.load_index(0);
         }
         if is_key_pressed(KeyCode::End) && !self.gallery.is_empty() {
