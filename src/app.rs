@@ -663,6 +663,18 @@ impl App {
             self.show_image_info = !self.show_image_info;
         }
 
+        // Cycle sort order (S) - không dùng khi Ctrl đang giữ
+        if is_key_pressed(KeyCode::S)
+            && !is_key_down(KeyCode::LeftControl)
+            && !is_key_down(KeyCode::RightControl)
+        {
+            let mode = self.gallery.sort_mode.next();
+            self.gallery.apply_sort(mode);
+            let n = self.gallery.index;
+            self.load_index(n);
+            self.set_toast(format!("Sắp xếp: {}", mode.label()), false);
+        }
+
         if is_key_pressed(KeyCode::R) {
             let shift = is_key_down(KeyCode::LeftShift) || is_key_down(KeyCode::RightShift);
             self.rotate_and_save(if shift { Rot::Ccw } else { Rot::Cw });
