@@ -66,6 +66,7 @@ pub struct App {
     fullscreen: bool,
     toast: Option<Toast>,
     show_image_info: bool,
+ show_help: bool,
     last_click_time: f64,
     hwnd: usize,
     was_maximized: bool,
@@ -156,6 +157,7 @@ impl App {
             fullscreen: false,
             toast: None,
             show_image_info: false,
+ show_help: false,
             last_click_time: 0.0,
             hwnd: 0,
             was_maximized: false,
@@ -705,7 +707,12 @@ impl App {
             self.delete_current();
         }
 
-        // Reset view: 0 / Numpad 0 or double-click (click = no drag)
+        // Toggle help overlay (H)
+ if is_key_pressed(KeyCode::H) {
+ self.show_help = !self.show_help;
+ }
+
+ // Reset view: 0 / Numpad 0 or double-click (click = no drag)
         if is_key_pressed(KeyCode::Key0) || is_key_pressed(KeyCode::Kp0) {
             self.reset_view();
             self.set_toast("View reset", false);
@@ -1018,6 +1025,7 @@ impl App {
                 );
             }
         }
+ self.draw_help();
     }
 
     fn draw_checkerboard(&self, region: Rect) {
@@ -1132,4 +1140,37 @@ impl App {
 
         true
     }
+ fn draw_help(&self) {
+if !self.show_help { return; }
+let items = [
+"H - Ẩn/hiện bảng trợ giúp",
+"← / → / ↑ / ↓ - Ảnh trước / ảnh sau",
+"Home / End - Ảnh đầu / ảnh cuối",
+"Space - Bật/tắt toàn màn hình",
+"Esc - Thoát toàn màn hình / hủy cắt / thoát",
+"C - Bật/tắt chế độ cắt ảnh",
+"Enter - Áp dụng cắt (khi đang cắt)",
+"R - Xoay phải (Shift+R: xoay trái) & lưu",
+"Ctrl+S - Lưu ảnh hiện tại",
+"Ctrl+C - Sao chép ảnh vào clipboard",
+"Ctrl+V - Dán ảnh từ clipboard",
+"Delete - Xóa ảnh (thùng rác)",
+"0 - Đặt lại khung nhìn",
+"I - Ẩn/hiện thông tin ảnh",
+"S - Đổi thứ tự sắp xếp",
+];
+let fs = 22u16;
+let lh = 34.0;
+let pad = 24.0;
+let max_w = items.iter().map(|l| measure_text(l, Some(&self.font), fs, 1.0).width).fold(0.0, f32::max);
+let w = max_w + pad * 2.0;
+let h = lh * items.len() as f32 + pad * 2.0 + 40.0;
+let x = (screen_width() - w) / 2.0;
+let y = (screen_height() - h) / 2.0;
+draw_rectangle(x, y, w, h, Color::new(0.0, 0.0, 0.0, 0.82));
+draw_text_ex("PHÍM TẮT", x + pad, y + pad + 24.0, TextParams { font: Some(&self.font), font_size: 26, color: YELLOW, ..Default::default() });
+for (i, it) in items.iter().enumerate() {
+draw_text_ex(it, x + pad, y + pad + 50.0 + lh * i as f32, TextParams { font: Some(&self.font), font_size: fs, color: WHITE, ..Default::default() });
+}
+}
 }
