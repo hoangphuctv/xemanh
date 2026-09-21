@@ -14,3 +14,5 @@ installer/*.exe
 output.txt
 *.log
 .DS_Store
+packaging/windows/set-default-assoc/target
+

@@ -9,6 +9,7 @@ pub struct Toolbar {
     pub toggle_rect: Rect,
     pub hovered: Option<usize>,
     pub toggle_hovered: bool,
+    pub slideshow_active: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -21,6 +22,8 @@ pub struct ToolbarButton {
 pub enum ToolbarAction {
     Prev,
     Next,
+    Play,
+    Interval,
     Crop,
     ZoomIn,
     ZoomOut,
@@ -36,6 +39,7 @@ impl Toolbar {
             toggle_rect: Rect::default(),
             hovered: None,
             toggle_hovered: false,
+            slideshow_active: false,
         }
     }
 
@@ -47,7 +51,7 @@ impl Toolbar {
 
         self.toggle_rect = Rect::new(win_w - toggle_w - toggle_margin, y, toggle_w, btn_h);
 
-        let count = 6;
+        let count = 8;
         let spacing = 7.0;
         let button_w = 38.0;
         let total_w = count as f32 * button_w + (count - 1) as f32 * spacing;
@@ -63,6 +67,8 @@ impl Toolbar {
             ToolbarAction::Crop,
             ToolbarAction::Prev,
             ToolbarAction::Next,
+            ToolbarAction::Play,
+            ToolbarAction::Interval,
             ToolbarAction::ZoomOut,
             ToolbarAction::ResetView,
             ToolbarAction::ZoomIn,
@@ -151,7 +157,11 @@ impl Toolbar {
                 btn_color
             };
             draw_button(btn.rect, color, border_color);
-            draw_action_icon(btn.action, btn.rect.center(), icon_color);
+            if btn.action == ToolbarAction::Play && self.slideshow_active {
+                draw_pause_icon(btn.rect.center(), icon_color);
+            } else {
+                draw_action_icon(btn.action, btn.rect.center(), icon_color);
+            }
 
             if Some(i) == self.hovered {
                 draw_tooltip(action_name(btn.action), btn.rect, font);
@@ -207,11 +217,33 @@ fn draw_action_icon(action: ToolbarAction, center: Vec2, color: Color) {
     match action {
         ToolbarAction::Prev => draw_chevron(center, true, color),
         ToolbarAction::Next => draw_chevron(center, false, color),
+        ToolbarAction::Play => draw_play_icon(center, color),
+        ToolbarAction::Interval => draw_interval_icon(center, color),
         ToolbarAction::Crop => draw_crop_icon(center, color),
         ToolbarAction::ZoomIn => draw_zoom_icon(center, true, color),
         ToolbarAction::ZoomOut => draw_zoom_icon(center, false, color),
         ToolbarAction::ResetView => draw_reset_label(center, color),
     }
+}
+
+fn draw_pause_icon(center: Vec2, color: Color) {
+    draw_rectangle(center.x - 6.0, center.y - 7.0, 4.0, 14.0, color);
+    draw_rectangle(center.x + 2.0, center.y - 7.0, 4.0, 14.0, color);
+}
+
+fn draw_play_icon(center: Vec2, color: Color) {
+    draw_triangle(
+        Vec2::new(center.x - 5.0, center.y - 7.0),
+        Vec2::new(center.x - 5.0, center.y + 7.0),
+        Vec2::new(center.x + 7.0, center.y),
+        color,
+    );
+}
+
+fn draw_interval_icon(center: Vec2, color: Color) {
+    draw_circle_lines(center.x, center.y, 8.0, 2.0, color);
+    draw_line(center.x, center.y, center.x, center.y - 5.0, 2.0, color);
+    draw_line(center.x, center.y, center.x + 4.0, center.y + 3.0, 2.0, color);
 }
 
 fn draw_chevron(center: Vec2, left: bool, color: Color) {
@@ -288,6 +320,8 @@ fn action_name(action: ToolbarAction) -> &'static str {
     match action {
         ToolbarAction::Prev => "Ảnh trước",
         ToolbarAction::Next => "Ảnh tiếp",
+        ToolbarAction::Play => "Slideshow",
+        ToolbarAction::Interval => "Khoảng thời gian",
         ToolbarAction::Crop => "Cắt ảnh",
         ToolbarAction::ZoomIn => "Phóng to",
         ToolbarAction::ZoomOut => "Thu nhỏ",
