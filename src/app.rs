@@ -1198,8 +1198,8 @@ impl App {
 if !self.show_help { return; }
 let items = [
 "H - Ẩn/hiện bảng trợ giúp",
-"← / → / ↑ / ↓ - Ảnh trước / ảnh sau",
-"Home / End - Ảnh đầu / ảnh cuối",
+"← / → / ↑ / ↓ / PageUp / PageDown - Ảnh trước / ảnh sau",
+"Home / 1 / End - Ảnh đầu / ảnh cuối",
 "Space - Bật/tắt toàn màn hình",
 "Esc - Thoát toàn màn hình / hủy cắt / thoát",
 "C - Bật/tắt chế độ cắt ảnh",
