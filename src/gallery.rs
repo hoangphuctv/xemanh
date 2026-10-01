@@ -3,6 +3,61 @@ use std::path::{Path, PathBuf};
 
 use crate::constants::IMAGE_EXTENSIONS;
 
+
+/// Cách sắp xếp danh sách ảnh trong thư mục.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum SortMode {
+    NameAsc,
+    ModifiedDesc,
+    SizeDesc,
+}
+
+impl SortMode {
+    pub fn label(self) -> &'static str {
+        match self {
+            SortMode::NameAsc => "Tên A→Z",
+            SortMode::ModifiedDesc => "Ngày sửa mới nhất",
+            SortMode::SizeDesc => "Dung lượng lớn nhất",
+        }
+    }
+
+    pub fn next(self) -> Self {
+        match self {
+            SortMode::NameAsc => SortMode::ModifiedDesc,
+            SortMode::ModifiedDesc => SortMode::SizeDesc,
+            SortMode::SizeDesc => SortMode::NameAsc,
+        }
+    }
+}
+
+/// Sếp xếp danh sách ảnh theo mode.
+pub fn sort_images(mut images: Vec<PathBuf>, mode: SortMode) -> Vec<PathBuf> {
+    match mode {
+        SortMode::NameAsc => {
+            images.sort_by_key(|p| {
+                p.file_name()
+                    .map(|n| n.to_string_lossy().to_lowercase())
+                    .unwrap_or_default()
+            });
+        }
+        SortMode::ModifiedDesc => {
+            images.sort_by(|a, b| {
+                let ta = fs::metadata(a).and_then(|m| m.modified()).ok();
+                let tb = fs::metadata(b).and_then(|m| m.modified()).ok();
+                tb.cmp(&ta)
+            });
+        }
+        SortMode::SizeDesc => {
+            images.sort_by(|a, b| {
+                let sa = fs::metadata(a).map(|m| m.len()).unwrap_or(0);
+                let sb = fs::metadata(b).map(|m| m.len()).unwrap_or(0);
+                sb.cmp(&sa)
+            });
+        }
+    }
+    images
+}
+
 /// Resolves a path, replacing a leading `~` with the user's home directory.
 pub fn resolve_path(path: PathBuf) -> PathBuf {
     let Some(path_str) = path.to_str() else {
@@ -68,6 +123,7 @@ pub fn file_name_of(path: &Path) -> String {
 pub struct Gallery {
     pub entries: Vec<PathBuf>,
     pub index: usize,
+    pub sort_mode: SortMode,
 }
 
 impl Gallery {
@@ -100,7 +156,7 @@ impl Gallery {
             .iter()
             .position(|p| same_path(p, &initial))
             .unwrap_or(0);
-        Ok(Self { entries, index })
+        Ok(Self { entries, index, sort_mode: SortMode::NameAsc })
     }
 
     pub fn is_empty(&self) -> bool {
@@ -150,6 +206,19 @@ impl Gallery {
             self.index = self.index.min(self.entries.len() - 1);
         }
         Some((name, empty))
+    }
+
+    /// Sếp xếp lại danh sách theo mode, giữ nguyen ảnh đang xem.
+    pub fn apply_sort(&mut self, mode: SortMode) -> usize {
+        let current = self.current_path();
+        self.entries = sort_images(std::mem::take(&mut self.entries), mode);
+        self.sort_mode = mode;
+        self.index = self
+            .entries
+            .iter()
+            .position(|p| same_path(p, &current))
+            .unwrap_or(0);
+        self.index
     }
 
     /// Title fragment: `filename [i/N]` or `(no images)`.
