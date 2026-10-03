@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Update GitHub release notes for a tag by reviewing git diff vs a previous tag.
-# Usage: ./update-release-note.sh <new-tag> <old-tag>
+# Usage: ./update-release-note.sh [<new-tag> <old-tag>]
 # Example: ./update-release-note.sh v0.1.18 v0.1.17
+#          ./update-release-note.sh   # auto-detect latest and previous tag
 
 set -euo pipefail
 
@@ -13,18 +14,36 @@ normalize_tag() {
   printf '%s' "$t"
 }
 
-if [[ $# -lt 2 ]]; then
-  echo "Usage: $0 <new-tag> <old-tag>" >&2
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+cd "$ROOT"
+
+if [[ $# -eq 0 ]]; then
+  if ! command -v git >/dev/null 2>&1; then
+    echo "error: git is required to auto-detect tags" >&2
+    exit 1
+  fi
+  NEW_TAG="$(git describe --tags --abbrev=0 2>/dev/null || true)"
+  if [[ -z "${NEW_TAG}" ]]; then
+    echo "error: no tags found; pass <new-tag> <old-tag> explicitly" >&2
+    exit 1
+  fi
+  OLD_TAG="$(git describe --tags --abbrev=0 "${NEW_TAG}^" 2>/dev/null || true)"
+  if [[ -z "${OLD_TAG}" ]]; then
+    echo "error: no previous tag before ${NEW_TAG}; pass <old-tag> explicitly" >&2
+    exit 1
+  fi
+  echo "==> Auto-detected tags: ${OLD_TAG} -> ${NEW_TAG}"
+elif [[ $# -eq 2 ]]; then
+  NEW_TAG="$(normalize_tag "$1")"
+  OLD_TAG="$(normalize_tag "$2")"
+else
+  echo "Usage: $0 [<new-tag> <old-tag>]" >&2
   echo "Example: $0 v0.1.18 v0.1.17" >&2
+  echo "       $0            # auto-detect latest and previous tag" >&2
   exit 1
 fi
 
-NEW_TAG="$(normalize_tag "$1")"
-OLD_TAG="$(normalize_tag "$2")"
 RANGE="${OLD_TAG}..${NEW_TAG}"
-
-ROOT="$(cd "$(dirname "$0")" && pwd)"
-cd "$ROOT"
 
 if ! git rev-parse -q --verify "refs/tags/${NEW_TAG}" >/dev/null; then
   echo "error: tag not found: ${NEW_TAG}" >&2
