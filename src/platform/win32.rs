@@ -653,3 +653,75 @@ pub fn copy_image_to_clipboard(
 ) -> Result<(), String> {
     Err("Clipboard copy is only supported on Windows".into())
 }
+
+/// Opens the OS file manager (Explorer / Finder / xdg) at the file's parent
+/// directory and selects the file when the OS supports it.
+#[cfg(target_os = "windows")]
+pub fn reveal_in_file_manager(path: &std::path::Path) -> Result<(), String> {
+use std::os::windows::ffi::OsStrExt;
+#[link(name = "shell32")]
+unsafe extern "system" {
+fn ShellExecuteW(
+hwnd: *mut std::ffi::c_void,
+lp_operation: *const u16,
+lp_file: *const u16,
+lp_parameters: *const u16,
+lp_directory: *const u16,
+n_show_cmd: i32,
+) -> *mut std::ffi::c_void;
+}
+fn to_wide(s: &std::ffi::OsStr) -> Vec<u16> {
+let mut v: Vec<u16> = s.encode_wide().collect();
+v.push(0);
+v
+}
+let op = to_wide(std::ffi::OsStr::new("open"));
+let explorer = to_wide(std::ffi::OsStr::new("explorer.exe"));
+// /select,"<path>" opens Explorer with the file highlighted.
+let param = format!("/select,"{}"", path.display());
+let param_wide = to_wide(std::ffi::OsStr::new(&param));
+let rc = unsafe {
+ShellExecuteW(
+std::ptr::null_mut(),
+op.as_ptr(),
+explorer.as_ptr(),
+param_wide.as_ptr(),
+std::ptr::null(),
+1, // SW_SHOWNORMAL
+)
+};
+// ShellExecuteW returns > 32 on success.
+if rc as isize > 32 {
+Ok(())
+} else {
+Err("Cannot open Explorer".into())
+}
+}
+
+#[cfg(target_os = "macos")]
+pub fn reveal_in_file_manager(path: &std::path::Path) -> Result<(), String> {
+use std::process::Command;
+let status = Command::new("open")
+.arg("-R")
+.arg(path)
+.status()
+.map_err(|e| format!("Cannot open Finder: {e}"))?;
+if status.success() {
+Ok(())
+} else {
+Err("Finder returned an error".into())
+}
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
+pub fn reveal_in_file_manager(path: &std::path::Path) -> Result<(), String> {
+use std::process::Command;
+let dir = path.parent().unwrap_or_else(|| std::path::Path::new("."));
+// Try common Linux file managers in order.
+for cmd in ["xdg-open", "nautilus", "dolphin", "thunar"] {
+if Command::new(cmd).arg(dir).spawn().is_ok() {
+return Ok(());
+}
+}
+Err("No file manager found".into())
+}

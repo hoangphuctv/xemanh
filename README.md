@@ -78,6 +78,7 @@ Mở một ảnh (double-click, hoặc kéo thả vào XemAnh). Các ảnh khác
 | Xoay phải và lưu | `R` |
 | Xoay trái và lưu | `Shift` + `R` |
 | Xóa ảnh (vào Thùng rác) | `Delete` |
+| Mở thư mục chứa ảnh | `F` |
 
 Thanh tiêu đề hiện tên file và vị trí trong thư mục, ví dụ `biển.jpg [3/12] - XemAnh`.
 
