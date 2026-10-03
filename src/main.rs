@@ -3,6 +3,7 @@
 mod app;
 mod constants;
 mod gallery;
+mod grid;
 mod image_io;
 mod platform;
 mod toolbar;

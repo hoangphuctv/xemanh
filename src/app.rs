@@ -9,6 +9,7 @@ use crate::constants::{
     ZOOM_MAX_NOTCHES_PER_EVENT, ZOOM_PER_NOTCH,
 };
 use crate::gallery::{file_name_of, Gallery};
+use crate::grid::GridMode;
 use crate::image_io::{make_checkerboard, LoadedImage, Rot};
 use crate::platform;
 use crate::toolbar::{Toolbar, ToolbarAction, TOOLBAR_HEIGHT};
@@ -104,6 +105,7 @@ pub struct App {
     slideshow_interval: f32,
     crop_state: CropState,
     updater: Updater,
+    grid: GridMode,
 }
 
 impl App {
@@ -196,6 +198,7 @@ impl App {
             slideshow_interval: 3.0,
             crop_state: CropState::default(),
             updater: Updater::new(),
+            grid: GridMode::default(),
         })
     }
 
@@ -685,6 +688,66 @@ impl App {
         }
     }
 
+fn open_grid(&mut self) {
+self.grid.open(self.gallery.index);
+self.set_toast("Grid mode - Enter to open", false);
+}
+
+fn handle_grid_input(&mut self) -> bool {
+let _win_w = screen_width();
+let win_h = screen_height();
+let top_offset = TOOLBAR_HEIGHT;
+let entry_count = self.gallery.len();
+if is_key_pressed(KeyCode::Escape) || is_key_pressed(KeyCode::GraveAccent) {
+self.grid.close();
+self.set_toast("Grid closed", false);
+return true;
+}
+if is_key_pressed(KeyCode::Enter) {
+let idx = self.grid.selected;
+self.grid.close();
+if !self.gallery.is_empty() {
+self.load_index(idx);
+}
+return true;
+}
+if is_key_pressed(KeyCode::Right) {
+self.grid.move_and_reveal(1, 0, entry_count, win_h, top_offset);
+}
+if is_key_pressed(KeyCode::Left) {
+self.grid.move_and_reveal(-1, 0, entry_count, win_h, top_offset);
+}
+if is_key_pressed(KeyCode::Down) || is_key_pressed(KeyCode::PageDown) {
+self.grid.move_and_reveal(0, 1, entry_count, win_h, top_offset);
+}
+if is_key_pressed(KeyCode::Up) || is_key_pressed(KeyCode::PageUp) {
+self.grid.move_and_reveal(0, -1, entry_count, win_h, top_offset);
+}
+if is_key_pressed(KeyCode::Home) {
+self.grid.selected = 0;
+self.grid.ensure_selected_visible(entry_count, win_h, top_offset);
+}
+if is_key_pressed(KeyCode::End) && !self.gallery.is_empty() {
+self.grid.selected = entry_count - 1;
+self.grid.ensure_selected_visible(entry_count, win_h, top_offset);
+}
+let wheel = mouse_wheel();
+if wheel.1 != 0.0 {
+self.grid.handle_wheel(wheel.1, entry_count, win_h, top_offset);
+}
+if is_mouse_button_pressed(MouseButton::Left) {
+let mouse = vec2(mouse_position().0, mouse_position().1);
+if let Some(idx) = self.grid.handle_click(mouse, entry_count) {
+if idx == self.grid.selected {
+self.grid.close();
+self.load_index(idx);
+} else {
+self.grid.selected = idx;
+}
+}
+}
+true
+}
     fn update_fullscreen_ui(&mut self) {
         if !self.fullscreen {
             return;
@@ -709,6 +772,17 @@ impl App {
     /// Handles all input. Returns false when the app should quit.
     fn handle_input(&mut self) -> bool {
         self.update_fullscreen_ui();
+
+        // Grid mode owns all input while active.
+        if self.grid.active {
+            return self.handle_grid_input();
+        }
+
+        // Toggle grid view with the backtick key.
+        if is_key_pressed(KeyCode::GraveAccent) {
+            self.open_grid();
+            return true;
+        }
 
         // Esc exits Crop mode first, then fullscreen, then quits app.
         if is_key_pressed(KeyCode::Escape) {
@@ -788,6 +862,14 @@ impl App {
                         None => {}
                     }
                 }
+            }
+        }
+
+        // Open containing folder (F)
+        if is_key_pressed(KeyCode::F) {
+            let path = self.gallery.current_path();
+            if let Err(err) = platform::reveal_in_file_manager(&path) {
+                self.set_toast(err, true);
             }
         }
 
@@ -1335,6 +1417,13 @@ impl App {
         let win_h = screen_height();
         self.toolbar.update_buttons(win_w, win_h);
 
+        // Grid mode draws its own full-screen view and skips the single-image path.
+        if self.grid.active {
+            self.grid.update(&self.gallery, win_w, win_h, TOOLBAR_HEIGHT, dt);
+            self.grid.draw(&self.gallery, win_w, win_h, TOOLBAR_HEIGHT, &self.font);
+            return true;
+        }
+
         // Clear and draw
         clear_background(BLACK);
 
@@ -1401,6 +1490,9 @@ let items = [
 "0 - Đặt lại khung nhìn",
 "I - Ẩn/hiện thông tin ảnh",
 "S - Đổi thứ tự sắp xếp",
+"F - Mở thư mục chứa ảnh",
+"` - Bật/tắt chế độ lưới (xem toàn thư mục)",
+"Trong lưới: mũi tên di chuyển, Enter mở, Esc/` đóng",
 ];
 let fs = 22u16;
 let lh = 34.0;
