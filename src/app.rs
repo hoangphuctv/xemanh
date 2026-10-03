@@ -215,7 +215,8 @@ impl App {
         self.view.reset();
     }
 
-    /// Shows `filename [i/N] - XemAnh` in the window title bar.
+    /// Shows `filename [i/N] (WxH) — XemAnh` in the window title bar.
+    /// Appends `[zoom%]` only when zoom differs from 100%.
     pub fn update_title(&mut self) {
         if self.hwnd == 0 {
             self.hwnd = platform::find_hwnd();
@@ -223,7 +224,20 @@ impl App {
                 platform::set_icon(self.hwnd, ICON_DATA);
             }
         }
-        let title = format!("XemAnh — {}", self.gallery.title_label());
+        let (w, h) = self.image.dimensions();
+        let zoom = self.view.zoom_percent();
+        let zoom_label = if zoom != 100 {
+            format!(" [{}%]", zoom)
+        } else {
+            String::new()
+        };
+        let title = format!(
+            "XemAnh — {} ({}×{}){}",
+            self.gallery.title_label(),
+            w,
+            h,
+            zoom_label
+        );
         platform::set_title(self.hwnd, &title);
     }
 
@@ -517,6 +531,7 @@ impl App {
                     if !self.fullscreen && !platform::is_zoomed(self.hwnd) {
                         self.request_window_for_texture();
                     }
+                    self.update_title();
                 }
                 Err(err) => {
                     self.set_toast(err, true);
@@ -832,6 +847,7 @@ impl App {
         if is_key_pressed(KeyCode::Key0) || is_key_pressed(KeyCode::Kp0) {
             self.reset_view();
             self.set_toast("View reset", false);
+            self.update_title();
         }
 
         let (mx, my) = mouse_position();
@@ -879,6 +895,7 @@ impl App {
                         );
                         let percent = (self.view.zoom_target * 100.0).round() as i32;
                         self.set_toast(format!("{percent}%"), false);
+                        self.update_title();
                     }
                     ToolbarAction::ZoomOut => {
                         let factor = 1.0 / ZOOM_PER_NOTCH;
@@ -893,6 +910,7 @@ impl App {
                         );
                         let percent = (self.view.zoom_target * 100.0).round() as i32;
                         self.set_toast(format!("{percent}%"), false);
+                        self.update_title();
                     }
                     ToolbarAction::Crop => {
                         self.crop_state.active = !self.crop_state.active;
@@ -906,6 +924,7 @@ impl App {
                     ToolbarAction::ResetView => {
                         self.reset_view();
                         self.set_toast("View reset", false);
+                        self.update_title();
                     }
                 }
                 return true;
@@ -1007,6 +1026,7 @@ impl App {
                 if now - self.last_click_time < DOUBLE_CLICK_SECS {
                     self.reset_view();
                     self.set_toast("View reset", false);
+                    self.update_title();
                     self.last_click_time = 0.0;
                 } else {
                     self.last_click_time = now;
@@ -1032,6 +1052,7 @@ impl App {
                     top_offset,
                 );
                 self.scroll_acc -= clamped * WHEEL_DELTA_UNIT;
+                self.update_title();
             }
         } else {
             self.scroll_acc = 0.0;

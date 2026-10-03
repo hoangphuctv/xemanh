@@ -188,6 +188,11 @@ impl LoadedImage {
         self.rgba = self.inner.to_rgba8();
         self.animation = None;
     }
+
+    /// Current image dimensions in pixels `(width, height)`.
+    pub fn dimensions(&self) -> (u32, u32) {
+        self.rgba.dimensions()
+    }
 }
 
 pub fn make_checkerboard() -> Texture2D {

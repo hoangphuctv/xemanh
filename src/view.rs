@@ -173,3 +173,10 @@ impl ViewState {
         self.clamp_pan(tex_w, tex_h, win_w, win_h);
     }
 }
+
+impl ViewState {
+/// Zoom hiển thị theo % so với kích thước gốc (dựa trên zoom_target).
+pub fn zoom_percent(&self) -> i32 {
+(self.zoom_target * 100.0).round() as i32
+}
+}
