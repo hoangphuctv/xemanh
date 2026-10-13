@@ -1,3 +1,4 @@
+use exif;
 use std::fs::File;
 use std::io::{BufReader, Cursor};
 use std::path::Path;
@@ -53,10 +54,36 @@ pub struct LoadedImage {
     animation: Option<ImageAnimation>,
 }
 
+// Helper to parse EXIF orientation and apply transformations
+fn parse_exif_orientation(path: &Path) -> u32 {
+    if let Ok(file) = File::open(path) {
+        let mut bufreader = BufReader::new(file);
+        if let Ok(exifreader) = exif::Reader::new().read_from_container(&mut bufreader) {
+            if let Some(field) = exifreader.get_field(exif::Tag::Orientation, exif::In::PRIMARY) {
+                if let Some(val) = field.value.get_uint(0) {
+                    return val;
+                }
+            }
+        }
+    }
+    1
+}
+
 impl LoadedImage {
     pub fn load(path: &Path) -> Result<Self, String> {
         let path_str = path.to_string_lossy().to_string();
-        let img = image::open(path).map_err(|e| format!("Failed to open {}: {}", path_str, e))?;
+        let mut img = image::open(path).map_err(|e| format!("Failed to open {}: {}", path_str, e))?;
+        let orientation = parse_exif_orientation(path);
+        match orientation {
+            2 => img = img.fliph(),
+            3 => img = img.rotate180(),
+            4 => img = img.flipv(),
+            5 => { img = img.rotate90(); img = img.fliph(); }
+            6 => img = img.rotate90(),
+            7 => { img = img.rotate270(); img = img.fliph(); }
+            8 => img = img.rotate270(),
+            _ => {}
+        }
         let ext = path
             .extension()
             .and_then(|e| e.to_str())
